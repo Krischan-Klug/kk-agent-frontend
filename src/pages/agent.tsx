@@ -450,7 +450,19 @@ export default function AgentPage() {
                         setEditAgent({ ...editAgent, mcpIds: newIds });
                       }}
                     />
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: m.running ? "var(--success)" : "var(--danger)",
+                        flexShrink: 0,
+                      }}
+                    />
                     {m.name}
+                    {!m.running && (
+                      <span style={{ color: "var(--danger)", fontSize: "0.7rem" }}>(stopped)</span>
+                    )}
                   </CheckboxRow>
                 ))}
               </div>
