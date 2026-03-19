@@ -20,7 +20,22 @@ const ModelHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: var(--space-md);
-  margin-bottom: var(--space-sm);
+`;
+
+const SettingsToggle = styled.button`
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  padding: 2px var(--space-xs);
+  opacity: 0.7;
+  transition: opacity 0.15s;
+
+  &:hover {
+    opacity: 1;
+    color: var(--text-primary);
+  }
 `;
 
 const ModelName = styled.div`
@@ -141,6 +156,7 @@ export default function ProviderPage() {
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [modelSettings, setModelSettings] = useState<Record<string, ModelSettings>>({});
   const [loading, setLoading] = useState(true);
+  const [expandedModels, setExpandedModels] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadData();
@@ -230,58 +246,71 @@ export default function ProviderPage() {
                       <option value="high">High</option>
                       <option value="on">On</option>
                     </Select>
+                    <SettingsToggle
+                      onClick={() =>
+                        setExpandedModels((prev) => {
+                          const next = new Set(prev);
+                          next.has(m.id) ? next.delete(m.id) : next.add(m.id);
+                          return next;
+                        })
+                      }
+                    >
+                      {expandedModels.has(m.id) ? "▲ Settings" : "▼ Settings"}
+                    </SettingsToggle>
                   </SettingsRow>
                 </ModelHeader>
 
-                {/* Per-Level Config Grid */}
-                <LevelGrid>
-                  <LevelHeaderCell>Level</LevelHeaderCell>
-                  <LevelHeaderCell>Temperature<UnitHint>0–2</UnitHint></LevelHeaderCell>
-                  <LevelHeaderCell>Max Output<UnitHint>tokens</UnitHint></LevelHeaderCell>
-                  {LEVELS.map((level, i) => {
-                    const lc = settings.levels?.[level] ?? {};
-                    const isDefault = level === settings.reasoningEffort;
-                    const isLast = i === LEVELS.length - 1;
-                    const defaults = REASONING_LEVEL_DEFAULTS[level];
-                    return (
-                      <React.Fragment key={level}>
-                        <LevelLabelCell $isDefault={isDefault} $isLast={isLast}>
-                          {isDefault && <DefaultDot />}
-                          {level}
-                        </LevelLabelCell>
-                        <LevelCell $isDefault={isDefault} $isLast={isLast}>
-                          <SmallInput
-                            type="number"
-                            min="0"
-                            max="2"
-                            step="0.1"
-                            $isDefault={isDefault}
-                            placeholder={defaults?.temperature?.toString() ?? "auto"}
-                            value={lc.temperature ?? ""}
-                            onChange={(e) => handleLevelChange(m.id, level, "temperature", e.target.value)}
-                          />
-                        </LevelCell>
-                        <LevelCell $isDefault={isDefault} $isLast={isLast}>
-                          <SmallInput
-                            type="number"
-                            min="-1"
-                            step="1024"
-                            $isDefault={isDefault}
-                            placeholder={
-                              defaults?.maxOutputTokens != null
-                                ? defaults.maxOutputTokens === -1
-                                  ? "unlimited"
-                                  : defaults.maxOutputTokens.toString()
-                                : "auto"
-                            }
-                            value={lc.maxOutputTokens ?? ""}
-                            onChange={(e) => handleLevelChange(m.id, level, "maxOutputTokens", e.target.value)}
-                          />
-                        </LevelCell>
-                      </React.Fragment>
-                    );
-                  })}
-                </LevelGrid>
+                {/* Per-Level Config Grid (toggleable) */}
+                {expandedModels.has(m.id) && (
+                  <LevelGrid>
+                    <LevelHeaderCell>Level</LevelHeaderCell>
+                    <LevelHeaderCell>Temperature<UnitHint>0–2</UnitHint></LevelHeaderCell>
+                    <LevelHeaderCell>Max Output<UnitHint>tokens</UnitHint></LevelHeaderCell>
+                    {LEVELS.map((level, i) => {
+                      const lc = settings.levels?.[level] ?? {};
+                      const isDefault = level === settings.reasoningEffort;
+                      const isLast = i === LEVELS.length - 1;
+                      const defaults = REASONING_LEVEL_DEFAULTS[level];
+                      return (
+                        <React.Fragment key={level}>
+                          <LevelLabelCell $isDefault={isDefault} $isLast={isLast}>
+                            {isDefault && <DefaultDot />}
+                            {level}
+                          </LevelLabelCell>
+                          <LevelCell $isDefault={isDefault} $isLast={isLast}>
+                            <SmallInput
+                              type="number"
+                              min="0"
+                              max="2"
+                              step="0.1"
+                              $isDefault={isDefault}
+                              placeholder={defaults?.temperature?.toString() ?? "auto"}
+                              value={lc.temperature ?? ""}
+                              onChange={(e) => handleLevelChange(m.id, level, "temperature", e.target.value)}
+                            />
+                          </LevelCell>
+                          <LevelCell $isDefault={isDefault} $isLast={isLast}>
+                            <SmallInput
+                              type="number"
+                              min="-1"
+                              step="1024"
+                              $isDefault={isDefault}
+                              placeholder={
+                                defaults?.maxOutputTokens != null
+                                  ? defaults.maxOutputTokens === -1
+                                    ? "unlimited"
+                                    : defaults.maxOutputTokens.toString()
+                                  : "auto"
+                              }
+                              value={lc.maxOutputTokens ?? ""}
+                              onChange={(e) => handleLevelChange(m.id, level, "maxOutputTokens", e.target.value)}
+                            />
+                          </LevelCell>
+                        </React.Fragment>
+                      );
+                    })}
+                  </LevelGrid>
+                )}
               </Card>
             );
           })

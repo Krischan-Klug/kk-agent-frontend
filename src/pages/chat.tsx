@@ -27,6 +27,9 @@ const TopBar = styled.div`
   border-bottom: 1px solid var(--border);
   margin-bottom: var(--space-md);
   flex-shrink: 0;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto var(--space-md);
 `;
 
 const TopBarInfo = styled.div`
@@ -83,7 +86,7 @@ const Messages = styled.div`
   flex-direction: column;
   gap: var(--space-md);
   padding: 0 0 var(--space-md);
-  max-width: 700px;
+  max-width: 900px;
   width: 100%;
   margin: 0 auto;
 `;
@@ -230,7 +233,7 @@ const InputArea = styled.div`
   padding-top: var(--space-md);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
-  max-width: 700px;
+  max-width: 900px;
   width: 100%;
   margin: 0 auto;
 `;
