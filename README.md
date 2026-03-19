@@ -1,40 +1,113 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# kk-agent-frontend
 
-## Getting Started
+Frontend für das Multi-Agent Framework. Verbindet sich mit dem Backend (Port 3001) und bietet Agent-Konfiguration, phasen-basiertes Chat-Streaming und MCP-Verwaltung.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Architektur
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                        Seiten                           │
+│                                                         │
+│  /chat          /agent          /session       /mcp     │
+│  Streaming-     Agent-Editor    Session-       MCP-     │
+│  Chat mit       Phasen-Graph   Verwaltung     CRUD     │
+│  Loop-State     Variablen      Agent-Auswahl           │
+│                 Prompts                                  │
+└────────┬────────────┬──────────────┬───────────┬────────┘
+         │            │              │           │
+┌────────▼────────────▼──────────────▼───────────▼────────┐
+│                    Komponenten                           │
+│                                                         │
+│  LoopStateViewer   PhaseGraph   AgentSelect   CodeBlock │
+│  ModelSelect       McpSelect   Sidebar        Modal     │
+└────────────────────────┬────────────────────────────────┘
+                         │
+┌────────────────────────▼────────────────────────────────┐
+│                     API Layer                            │
+│              lib/api.ts → Backend :3001                  │
+│                                                         │
+│  agent.*    session.*    mcp.*    provider.*             │
+│  CRUD,      CRUD,        CRUD,   Models,                │
+│  LoopState  Chat/Stream  Tools   Switch                 │
+└─────────────────────────────────────────────────────────┘
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## Seiten
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+| Route | Funktion |
+|-------|----------|
+| `/chat` | Streaming-Chat mit Live-Reasoning, Tool-Cards, Phase-Anzeige, Loop-State |
+| `/agent` | Agent-Editor: Phasen-Graph, Transitions, Prompts, Variablen, MCP-Zuordnung |
+| `/session` | Sessions erstellen/löschen, Agent und Model zuweisen |
+| `/mcp` | MCP-Server verwalten (stdio/SSE), Tools inspizieren, Instructions |
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Agent-Editor (`/agent`)
 
-## Learn More
+Der Agent-Editor ist das Kernstück der Konfiguration:
 
-To learn more about Next.js, take a look at the following resources:
+```
+┌─────────────────────────────────────────┐
+│  Agent-Liste  │  Editor                 │
+│               │                         │
+│  > General    │  Name, Description      │
+│    Coding     │  ──────────────────     │
+│               │  Phasen-Graph (visuell) │
+│               │  ──────────────────     │
+│               │  MCPs (Multi-Select)    │
+│               │  ──────────────────     │
+│               │  Variablen (Key/Value)  │
+│               │  ──────────────────     │
+│               │  Base-Prompt            │
+│               │  Phasen-Prompts         │
+│               │  ──────────────────     │
+│               │  LoopStateViewer        │
+└───────────────┴─────────────────────────┘
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
+- **PhaseGraph**: Visualisiert Phasen als Knoten und Transitions als Kanten
+- **Variablen**: Custom Template-Variablen (`{{KEY}}`), zusätzlich zu System-Variablen (`{{CURRENT_DATE}}`, etc.)
+- **Prompts**: Base-Prompt + phasenspezifische Erweiterungen, beide mit Variable-Resolution
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## Chat-Integration
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Der Chat zeigt den Agent-Loop in Echtzeit:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+- **SSE-Events**: `content`, `reasoning`, `tool_call`, `tool_result`, `phase_change`, `loop_state`, `done`, `error`
+- **Phase-Anzeige**: Aktuelle Phase und Iteration sichtbar während der Ausführung
+- **Tool-Cards**: Tool-Aufrufe und -Ergebnisse als aufklappbare Cards
+- **Reasoning-Cards**: `<think>`-Blöcke als togglebare Cards
+
+---
+
+## Schlüssel-Komponenten
+
+| Komponente | Funktion |
+|-----------|----------|
+| `PhaseGraph` | SVG-Visualisierung des Phasen-Graphen mit Transitions |
+| `LoopStateViewer` | Echtzeit Loop-State via SSE, Phase-Timeline, Event-Log |
+| `AgentSelect` | Agent-Auswahl für Session-Erstellung |
+| `ModelSelect` | Model-Wechsel per Dropdown |
+| `McpSelect` | MCP-Toggle pro Session |
+| `CodeBlock` | Syntax-Highlighting, Copy, Collapse bei 50+ Zeilen |
+| `Sidebar` | Navigation + Session-Liste |
+
+---
+
+## Quick Start
+
+```bash
+npm install
+npm run dev   # Port 3000
+```
+
+Voraussetzung: Backend auf `http://localhost:3001` (konfigurierbar via `NEXT_PUBLIC_API_URL`).
+
+Tech-Stack: Next.js (Pages Router), styled-components, TypeScript.
