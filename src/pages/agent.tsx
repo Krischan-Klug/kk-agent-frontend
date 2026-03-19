@@ -166,6 +166,8 @@ function emptyPhase(name = "new-phase"): LoopPhase {
     name,
     description: "",
     maxIterations: 5,
+    completionCriteria: { mode: "stop" },
+    continueOnStop: false,
     transitions: [],
     autoAdvance: true,
   };
@@ -183,6 +185,8 @@ const CONDITION_TYPES: { value: TransitionCondition["type"]; label: string }[] =
   { value: "no_tool_calls", label: "No Tool Calls" },
   { value: "max_iterations", label: "Max Iterations" },
   { value: "tool_called", label: "Tool Called" },
+  { value: "tool_result_error", label: "Tool Result Error" },
+  { value: "phase_complete", label: "Phase Complete" },
   { value: "keyword", label: "Keyword" },
   { value: "always", label: "Always" },
 ];
@@ -739,6 +743,49 @@ export default function AgentPage() {
                         onChange={() => updatePhase(activePhase.name, { autoAdvance: !activePhase.autoAdvance })}
                       />
                     </div>
+                    <div>
+                      <FieldLabel>Continue On Stop</FieldLabel>
+                      <Toggle
+                        checked={activePhase.continueOnStop ?? false}
+                        onChange={() => updatePhase(activePhase.name, { continueOnStop: !(activePhase.continueOnStop ?? false) })}
+                      />
+                    </div>
+                  </Row>
+                  <Row>
+                    <div>
+                      <FieldLabel>Completion Mode</FieldLabel>
+                      <Select
+                        value={activePhase.completionCriteria?.mode ?? "stop"}
+                        onChange={(e) =>
+                          updatePhase(activePhase.name, {
+                            completionCriteria: e.target.value === "signal"
+                              ? { mode: "signal", signal: activePhase.completionCriteria?.signal ?? "" }
+                              : { mode: "stop" },
+                          })
+                        }
+                      >
+                        <option value="stop">Stop</option>
+                        <option value="signal">Signal</option>
+                      </Select>
+                    </div>
+                    {activePhase.completionCriteria?.mode === "signal" && (
+                      <div style={{ flex: 1 }}>
+                        <FieldLabel>Completion Signal</FieldLabel>
+                        <Input
+                          value={activePhase.completionCriteria.signal ?? ""}
+                          onChange={(e) =>
+                            updatePhase(activePhase.name, {
+                              completionCriteria: {
+                                ...activePhase.completionCriteria,
+                                mode: "signal",
+                                signal: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="PHASE_COMPLETE: EXECUTE"
+                        />
+                      </div>
+                    )}
                   </Row>
                   {/* Transitions */}
                   <div style={{ marginTop: "var(--space-md)" }}>

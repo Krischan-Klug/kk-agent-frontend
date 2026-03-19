@@ -32,6 +32,7 @@ export interface CreateSessionBody {
   agentId: string;
   model?: string;
   activeMcpIds?: string[];
+  reasoningEffort?: ReasoningEffort;
 }
 
 /* ── MCP ── */
@@ -142,8 +143,16 @@ export interface LoopPhase {
   description: string;
   maxIterations: number;
   toolFilter?: ToolFilter;
+  completionCriteria?: PhaseCompletionCriteria;
+  continueOnStop?: boolean;
   transitions: PhaseTransition[];
   autoAdvance: boolean;
+}
+
+export interface PhaseCompletionCriteria {
+  mode: "stop" | "signal";
+  signal?: string;
+  requiresToolCall?: boolean;
 }
 
 export interface ToolFilter {
@@ -160,6 +169,8 @@ export type TransitionCondition =
   | { type: "max_iterations" }
   | { type: "no_tool_calls" }
   | { type: "tool_called"; toolName: string }
+  | { type: "tool_result_error" }
+  | { type: "phase_complete" }
   | { type: "keyword"; keyword: string }
   | { type: "always" };
 

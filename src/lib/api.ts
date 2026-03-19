@@ -85,8 +85,6 @@ export const mcp = {
 export const agent = {
   list: () => request<AgentDefinition[]>("/agent"),
 
-  get: (id: string) => request<AgentDefinition>(`/agent/${id}`),
-
   create: (body: CreateAgentBody) =>
     request<AgentDefinition>("/agent", {
       method: "POST",
@@ -181,12 +179,6 @@ export const session = {
 
   getPrompt: (id: string) =>
     request<{ systemPrompt: string }>(`/session/${id}/prompt`),
-
-  compact: (id: string, keepLast?: number) =>
-    request<SessionState>(`/session/${id}/compact`, {
-      method: "POST",
-      body: JSON.stringify({ keepLast }),
-    }),
 
   chatStream: async (
     id: string,

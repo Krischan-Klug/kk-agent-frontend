@@ -127,6 +127,8 @@ function conditionLabel(t: PhaseTransition): string {
     case "max_iterations": return "max iter";
     case "no_tool_calls": return "no tools";
     case "tool_called": return `tool: ${t.condition.toolName}`;
+    case "tool_result_error": return "tool error";
+    case "phase_complete": return "phase done";
     case "keyword": return `kw: ${t.condition.keyword}`;
     case "always": return "always";
   }
