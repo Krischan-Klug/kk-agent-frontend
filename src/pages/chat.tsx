@@ -454,6 +454,9 @@ export default function ChatPage() {
     ? (session.reasoningEffort ?? modelSettingsMap[session.model]?.reasoningEffort ?? "medium")
     : "medium";
 
+  // Resolve effective temperature: session override > level config > default (1.0)
+  const resolvedTemp: number = session?.temperature ?? 1.0;
+
   // Context info
   const modelInfo = session ? modelInfoMap.get(session.model) : undefined;
   const maxCtx = modelInfo?.contextLength ?? modelInfo?.maxContextLength ?? 0;
@@ -570,6 +573,16 @@ export default function ChatPage() {
     const reasoningEffort = (value || undefined) as ReasoningEffort | undefined;
     try {
       const updated = await sessionApi.update(session.id, { reasoningEffort });
+      setSession(updated);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleTemperature(value: string) {
+    if (!session) return;
+    try {
+      const updated = await sessionApi.update(session.id, { temperature: Number(value) });
       setSession(updated);
     } catch (err) {
       console.error(err);
@@ -798,6 +811,16 @@ export default function ChatPage() {
             <option value="low">Low</option>
             <option value="medium">Med</option>
             <option value="high">High</option>
+          </ReasoningSelect>
+          <span style={{ fontSize: "var(--font-size-sm)" }}>🔥</span>
+          <ReasoningSelect
+            value={resolvedTemp.toFixed(1)}
+            onChange={(e) => handleTemperature(e.target.value)}
+          >
+            {Array.from({ length: 21 }, (_, i) => {
+              const v = (i * 0.1).toFixed(1);
+              return <option key={v} value={v}>{v}</option>;
+            })}
           </ReasoningSelect>
         </InputLeft>
         <ChatInput

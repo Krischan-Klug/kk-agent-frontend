@@ -164,7 +164,7 @@ export const session = {
   delete: (id: string) =>
     request<{ deleted: boolean }>(`/session/${id}`, { method: "DELETE" }),
 
-  update: (id: string, body: { model?: string; activeMcpIds?: string[]; reasoningEffort?: string }) =>
+  update: (id: string, body: { model?: string; activeMcpIds?: string[]; reasoningEffort?: string; temperature?: number }) =>
     request<SessionState>(`/session/${id}`, {
       method: "PATCH",
       body: JSON.stringify(body),
