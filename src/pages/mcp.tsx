@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import styled from "styled-components";
 import { mcp as mcpApi } from "@/lib/api";
-import type { McpListItem, CreateMcpBody } from "@/types/api";
+import type { McpListItem, McpStdioConfig, CreateMcpBody } from "@/types/api";
 import { PageTitle } from "@/components/Layout.styled";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
@@ -129,6 +129,12 @@ const Actions = styled.div`
   margin-top: var(--space-sm);
 `;
 
+const EnvRow = styled.div`
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+`;
+
 const ConfigDetail = styled.div`
   margin-top: var(--space-sm);
   padding: var(--space-sm) var(--space-md);
@@ -147,7 +153,7 @@ export default function McpPage() {
   const [expandedInstructions, setExpandedInstructions] = useState<Set<string>>(new Set());
   const [expandedEdit, setExpandedEdit] = useState<Set<string>>(new Set());
   const [editForms, setEditForms] = useState<
-    Record<string, { name: string; command: string; args: string; url: string }>
+    Record<string, { name: string; command: string; args: string; url: string; env: Record<string, string> }>
   >({});
 
   // Create modal
@@ -157,6 +163,7 @@ export default function McpPage() {
     transport: "stdio",
     command: "",
     args: [],
+    env: {},
     url: "",
     instruction: "",
   });
@@ -208,6 +215,7 @@ export default function McpPage() {
   async function handleCreate() {
     setCreating(true);
     try {
+      const envEntries = Object.keys(createForm.env ?? {}).length > 0 ? createForm.env : undefined;
       await mcpApi.create({
         name: createForm.name,
         transport: createForm.transport,
@@ -216,11 +224,12 @@ export default function McpPage() {
           createForm.transport === "stdio" && createForm.args?.length
             ? createForm.args
             : undefined,
+        env: createForm.transport === "stdio" ? envEntries : undefined,
         url: createForm.transport === "sse" ? createForm.url : undefined,
         instruction: createForm.instruction || undefined,
       });
       setShowCreate(false);
-      setCreateForm({ name: "", transport: "stdio", command: "", args: [], url: "", instruction: "" });
+      setCreateForm({ name: "", transport: "stdio", command: "", args: [], env: {}, url: "", instruction: "" });
       await loadMcps();
     } catch (err) {
       console.error(err);
@@ -240,7 +249,7 @@ export default function McpPage() {
   }
 
   function openEdit(m: McpListItem) {
-    const server = m.server as { command?: string; args?: string[]; url?: string };
+    const server = m.server as McpStdioConfig & { url?: string };
     setEditForms((prev) => ({
       ...prev,
       [m.id]: {
@@ -248,6 +257,7 @@ export default function McpPage() {
         command: server.command ?? "",
         args: (server.args ?? []).join("\n"),
         url: server.url ?? "",
+        env: server.env ?? {},
       },
     }));
     setExpandedEdit((prev) => {
@@ -257,16 +267,21 @@ export default function McpPage() {
     });
   }
 
-  async function handleSaveEdit(id: string, transport: string) {
+  async function handleSaveEdit(id: string, transport: string, restart?: boolean) {
     const form = editForms[id];
     if (!form) return;
     try {
+      const envPayload = Object.keys(form.env).length > 0 ? form.env : undefined;
       await mcpApi.update(id, {
         name: form.name,
         ...(transport === "stdio"
-          ? { command: form.command, args: form.args.split("\n").filter(Boolean) }
+          ? { command: form.command, args: form.args.split("\n").filter(Boolean), env: envPayload }
           : { url: form.url }),
       });
+      if (restart) {
+        try { await mcpApi.stop(id); } catch { /* not running */ }
+        await mcpApi.start(id);
+      }
       setExpandedEdit((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -340,8 +355,13 @@ export default function McpPage() {
             {!expandedEdit.has(m.id) && (
               <ConfigDetail>
                 {m.transport === "stdio"
-                  ? `${(m.server as { command: string }).command} ${((m.server as { args: string[] }).args ?? []).join(" ")}`
+                  ? `${(m.server as McpStdioConfig).command} ${((m.server as McpStdioConfig).args ?? []).join(" ")}`
                   : (m.server as { url: string }).url}
+                {m.transport === "stdio" && Object.keys((m.server as McpStdioConfig).env ?? {}).length > 0 && (
+                  <div style={{ marginTop: "var(--space-xs)", color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>
+                    env: {Object.entries((m.server as McpStdioConfig).env!).map(([k, v]) => `${k}=${v}`).join(", ")}
+                  </div>
+                )}
               </ConfigDetail>
             )}
 
@@ -387,6 +407,68 @@ export default function McpPage() {
                         rows={4}
                       />
                     </div>
+                    <div>
+                      <label>Umgebungsvariablen</label>
+                      {Object.entries(editForms[m.id].env).map(([key, value]) => (
+                        <EnvRow key={key}>
+                          <Input
+                            value={key}
+                            onChange={(e) => {
+                              const newEnv = { ...editForms[m.id].env };
+                              delete newEnv[key];
+                              newEnv[e.target.value] = value;
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [m.id]: { ...prev[m.id], env: newEnv },
+                              }));
+                            }}
+                            placeholder="KEY"
+                            style={{ width: 160, fontFamily: "var(--font-mono)", fontSize: "var(--font-size-sm)" }}
+                          />
+                          <Input
+                            value={value}
+                            onChange={(e) =>
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [m.id]: { ...prev[m.id], env: { ...prev[m.id].env, [key]: e.target.value } },
+                              }))
+                            }
+                            placeholder="Wert"
+                            style={{ flex: 1 }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="danger"
+                            onClick={() => {
+                              const newEnv = { ...editForms[m.id].env };
+                              delete newEnv[key];
+                              setEditForms((prev) => ({
+                                ...prev,
+                                [m.id]: { ...prev[m.id], env: newEnv },
+                              }));
+                            }}
+                          >
+                            x
+                          </Button>
+                        </EnvRow>
+                      ))}
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() =>
+                          setEditForms((prev) => ({
+                            ...prev,
+                            [m.id]: {
+                              ...prev[m.id],
+                              env: { ...prev[m.id].env, [`VAR_${Object.keys(prev[m.id].env).length + 1}`]: "" },
+                            },
+                          }))
+                        }
+                        style={{ marginTop: "var(--space-xs)" }}
+                      >
+                        + Variable
+                      </Button>
+                    </div>
                   </>
                 ) : (
                   <div>
@@ -409,6 +491,14 @@ export default function McpPage() {
                   >
                     Speichern
                   </Button>
+                  {m.running && (
+                    <Button
+                      size="sm"
+                      onClick={() => handleSaveEdit(m.id, m.transport, true)}
+                    >
+                      Speichern & Neustarten
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="secondary"
@@ -532,6 +622,59 @@ export default function McpPage() {
                     rows={4}
                     placeholder={"-y\n@modelcontextprotocol/server-filesystem\n/path/to/dir"}
                   />
+                </div>
+                <div>
+                  <label>Umgebungsvariablen</label>
+                  {Object.entries(createForm.env ?? {}).map(([key, value]) => (
+                    <EnvRow key={key}>
+                      <Input
+                        value={key}
+                        onChange={(e) => {
+                          const newEnv = { ...createForm.env };
+                          delete newEnv[key];
+                          newEnv[e.target.value] = value;
+                          setCreateForm((prev) => ({ ...prev, env: newEnv }));
+                        }}
+                        placeholder="KEY"
+                        style={{ width: 160, fontFamily: "var(--font-mono)", fontSize: "var(--font-size-sm)" }}
+                      />
+                      <Input
+                        value={value}
+                        onChange={(e) =>
+                          setCreateForm((prev) => ({
+                            ...prev,
+                            env: { ...prev.env, [key]: e.target.value },
+                          }))
+                        }
+                        placeholder="Wert"
+                        style={{ flex: 1 }}
+                      />
+                      <Button
+                        size="sm"
+                        variant="danger"
+                        onClick={() => {
+                          const newEnv = { ...createForm.env };
+                          delete newEnv[key];
+                          setCreateForm((prev) => ({ ...prev, env: newEnv }));
+                        }}
+                      >
+                        x
+                      </Button>
+                    </EnvRow>
+                  ))}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() =>
+                      setCreateForm((prev) => ({
+                        ...prev,
+                        env: { ...prev.env, [`VAR_${Object.keys(prev.env ?? {}).length + 1}`]: "" },
+                      }))
+                    }
+                    style={{ marginTop: "var(--space-xs)" }}
+                  >
+                    + Variable
+                  </Button>
                 </div>
               </>
             ) : (
