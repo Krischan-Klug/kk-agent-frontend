@@ -262,6 +262,7 @@ export default function AgentPage() {
         variables: editAgent.variables,
         defaultModel: editAgent.defaultModel,
         reasoningEffort: editAgent.reasoningEffort,
+        compactionPrompt: editAgent.compactionPrompt,
       });
       setAgents((prev) => prev.map((a) => (a.id === selectedId ? updated : a)));
       setEditAgent(structuredClone(updated));
@@ -592,6 +593,36 @@ export default function AgentPage() {
                   placeholder="Der Basis-System-Prompt für diesen Agent..."
                 />
               </div>
+            </Section>
+
+            {/* Compaction Prompt (opt-in) */}
+            <Section>
+              <SectionTitle>
+                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={editAgent.compactionPrompt != null}
+                    onChange={(e) =>
+                      setEditAgent({
+                        ...editAgent,
+                        compactionPrompt: e.target.checked ? "" : undefined,
+                      })
+                    }
+                    style={{ accentColor: "var(--accent)" }}
+                  />
+                  Custom Compaction Prompt
+                </label>
+              </SectionTitle>
+              {editAgent.compactionPrompt != null && (
+                <div>
+                  <TextArea
+                    value={editAgent.compactionPrompt}
+                    onChange={(e) => setEditAgent({ ...editAgent, compactionPrompt: e.target.value })}
+                    rows={8}
+                    placeholder="Überschreibt den Default-Compaction-Prompt für diesen Agent..."
+                  />
+                </div>
+              )}
             </Section>
 
             {/* Loop Strategy */}

@@ -262,6 +262,7 @@ export default function ProviderPage() {
 
                 {/* Per-Level Config Grid (toggleable) */}
                 {expandedModels.has(m.id) && (
+                  <>
                   <LevelGrid>
                     <LevelHeaderCell>Level</LevelHeaderCell>
                     <LevelHeaderCell>Temperature<UnitHint>0–2</UnitHint></LevelHeaderCell>
@@ -310,6 +311,59 @@ export default function ProviderPage() {
                       );
                     })}
                   </LevelGrid>
+
+                  {/* Compaction Prompt (opt-in) */}
+                  <div style={{ marginTop: "var(--space-sm)" }}>
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "var(--space-sm)",
+                        fontSize: "var(--font-size-sm)",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        marginBottom: settings.compactionPrompt != null ? "var(--space-xs)" : 0,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={settings.compactionPrompt != null}
+                        onChange={(e) => {
+                          const newSettings = { ...settings };
+                          if (e.target.checked) {
+                            newSettings.compactionPrompt = "";
+                          } else {
+                            delete newSettings.compactionPrompt;
+                          }
+                          saveSettings(m.id, newSettings);
+                        }}
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      Custom Compaction Prompt
+                    </label>
+                    {settings.compactionPrompt != null && (
+                      <textarea
+                        rows={4}
+                        value={settings.compactionPrompt}
+                        placeholder="Überschreibt den Default-Compaction-Prompt für dieses Model..."
+                        onChange={(e) =>
+                          saveSettings(m.id, { ...settings, compactionPrompt: e.target.value })
+                        }
+                        style={{
+                          resize: "vertical",
+                          width: "100%",
+                          background: "var(--bg-elevated)",
+                          border: "1px solid var(--border)",
+                          borderRadius: "var(--radius-sm)",
+                          color: "var(--text-primary)",
+                          fontSize: "var(--font-size-sm)",
+                          padding: "var(--space-xs) var(--space-sm)",
+                          fontFamily: "var(--font-mono)",
+                        }}
+                      />
+                    )}
+                  </div>
+                  </>
                 )}
               </Card>
             );

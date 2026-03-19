@@ -81,6 +81,7 @@ export interface ReasoningLevelConfig {
 export interface ModelSettings {
   reasoningEffort?: ReasoningEffort;
   levels?: Record<string, ReasoningLevelConfig>;
+  compactionPrompt?: string;
 }
 
 export interface CreateMcpBody {
@@ -116,6 +117,7 @@ export interface AgentDefinition {
   variables: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
+  compactionPrompt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -188,6 +190,7 @@ export interface CreateAgentBody {
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
+  compactionPrompt?: string;
 }
 
 export interface UpdateAgentBody {
@@ -200,6 +203,7 @@ export interface UpdateAgentBody {
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
+  compactionPrompt?: string;
 }
 
 /* ── Streaming ── */
