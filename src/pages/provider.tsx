@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import styled from "styled-components";
 import { provider as providerApi } from "@/lib/api";
-import type { ModelInfo, ModelSettings, ReasoningEffort, ReasoningLevelConfig } from "@/types/api";
-import { REASONING_LEVEL_DEFAULTS } from "@/constants/reasoningDefaults";
+import type { ModelInfo, ModelSettings, ReasoningLevelConfig } from "@/types/api";
+import { REASONING_LEVELS, REASONING_LEVEL_DEFAULTS } from "@/constants/reasoningDefaults";
 import { PageTitle } from "@/components/Layout.styled";
 import Card from "@/components/Card";
 import Spinner from "@/components/Spinner";
@@ -146,9 +146,7 @@ const SmallInput = styled.input<{ $isDefault?: boolean }>`
   }
 `;
 
-/* ── Constants ── */
 
-const LEVELS = ["off", "low", "medium", "high", "on"] as const;
 
 /* ── Page ── */
 
@@ -185,7 +183,7 @@ export default function ProviderPage() {
 
   function handleDefaultChange(modelId: string, value: string) {
     const settings = modelSettings[modelId] ?? {};
-    saveSettings(modelId, { ...settings, reasoningEffort: (value || undefined) as ReasoningEffort | undefined });
+    saveSettings(modelId, { ...settings, reasoningEffort: value || undefined });
   }
 
   function handleLevelChange(modelId: string, level: string, field: keyof ReasoningLevelConfig, value: string) {
@@ -234,17 +232,24 @@ export default function ProviderPage() {
                     )}
                   </ModelName>
                   <SettingsRow>
+                    <label style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "var(--font-size-sm)", color: "var(--text-muted)", cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={settings.reasoningOnOff ?? false}
+                        onChange={(e) => saveSettings(m.id, { ...settings, reasoningOnOff: e.target.checked || undefined })}
+                        style={{ accentColor: "var(--accent)" }}
+                      />
+                      On/Off
+                    </label>
                     <Label>Default:</Label>
                     <Select
                       value={settings.reasoningEffort ?? ""}
                       onChange={(e) => handleDefaultChange(m.id, e.target.value)}
                     >
                       <option value="">--</option>
-                      <option value="off">Off</option>
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="on">On</option>
+                      {REASONING_LEVELS.map((l) => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
                     </Select>
                     <SettingsToggle
                       onClick={() =>
@@ -267,10 +272,10 @@ export default function ProviderPage() {
                     <LevelHeaderCell>Level</LevelHeaderCell>
                     <LevelHeaderCell>Temperature<UnitHint>0–2</UnitHint></LevelHeaderCell>
                     <LevelHeaderCell>Max Output<UnitHint>tokens</UnitHint></LevelHeaderCell>
-                    {LEVELS.map((level, i) => {
+                    {REASONING_LEVELS.map((level, i) => {
                       const lc = settings.levels?.[level] ?? {};
                       const isDefault = level === settings.reasoningEffort;
-                      const isLast = i === LEVELS.length - 1;
+                      const isLast = i === REASONING_LEVELS.length - 1;
                       const defaults = REASONING_LEVEL_DEFAULTS[level];
                       return (
                         <React.Fragment key={level}>

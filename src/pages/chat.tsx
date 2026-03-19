@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import styled from "styled-components";
 import { session as sessionApi, provider as providerApi, mcp as mcpApi, agent as agentApi } from "@/lib/api";
 import type { SessionState, SessionMessage, StreamEvent, McpListItem, AgentDefinition, AgentLoopState, ModelInfo, ModelSettings, ReasoningEffort } from "@/types/api";
+import { REASONING_LEVELS } from "@/constants/reasoningDefaults";
 import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 import Spinner from "@/components/Spinner";
@@ -452,6 +453,8 @@ export default function ChatPage() {
   const phases = currentAgent?.loopStrategy.phases ?? [];
   const hasMultiplePhases = phases.length > 1;
 
+  const reasoningLevels = REASONING_LEVELS;
+
   // Resolve effective reasoning effort: session override > model default > "medium"
   const resolvedEffort: ReasoningEffort = session
     ? (session.reasoningEffort ?? modelSettingsMap[session.model]?.reasoningEffort ?? "medium")
@@ -573,7 +576,7 @@ export default function ChatPage() {
 
   async function handleReasoningEffort(value: string) {
     if (!session) return;
-    const reasoningEffort = (value || undefined) as ReasoningEffort | undefined;
+    const reasoningEffort = value || undefined;
     try {
       const updated = await sessionApi.update(session.id, { reasoningEffort });
       setSession(updated);
@@ -811,9 +814,9 @@ export default function ChatPage() {
             value={resolvedEffort}
             onChange={(e) => handleReasoningEffort(e.target.value)}
           >
-            <option value="low">Low</option>
-            <option value="medium">Med</option>
-            <option value="high">High</option>
+            {reasoningLevels.map((l) => (
+              <option key={l} value={l}>{l}</option>
+            ))}
           </ReasoningSelect>
           <span style={{ fontSize: "var(--font-size-sm)" }}>🔥</span>
           <ReasoningSelect

@@ -82,7 +82,7 @@ Der Agent-Editor ist das Kernstück der Konfiguration:
 - **Variablen**: Custom Template-Variablen (`{{KEY}}`), zusätzlich zu System-Variablen (`{{CURRENT_DATE}}`, etc.)
 - **Prompts**: Base-Prompt + phasenspezifische Erweiterungen, beide mit Variable-Resolution
 - **MCPs**: Multi-Select mit Status-Dots (grün = running, rot = stopped)
-- **Reasoning Effort**: Default Reasoning-Level pro Agent (off/low/medium/high/on)
+- **Reasoning Effort**: Default Reasoning-Level pro Agent (off/low/medium/high/xhigh)
 - **Compaction Prompt**: Opt-in Custom-Prompt für Context-Komprimierung (überschreibt Provider/Default)
 
 ---
@@ -95,8 +95,8 @@ Der Chat zeigt den Agent-Loop in Echtzeit:
 - **Phase-Anzeige**: Aktuelle Phase und Iteration sichtbar während der Ausführung
 - **Tool-Cards**: Tool-Aufrufe und -Ergebnisse als aufklappbare Cards
 - **Reasoning-Cards**: `<think>`-Blöcke als togglebare Cards
-- **🧠 Reasoning-Select**: Reasoning-Level wählen (Low/Med/High) — wird als Session-Override gespeichert
-- **🔥 Temperature-Select**: Temperature wählen (0.0–2.0 in 0.1-Schritten) — wird als Session-Override gespeichert
+- **Reasoning-Select**: Reasoning-Level wählen (Off/Low/Med/High/XHigh) — wird als Session-Override gespeichert
+- **Temperature-Select**: Temperature wählen (0.0–2.0 in 0.1-Schritten) — wird als Session-Override gespeichert
 - **Context-Ring**: SVG-Kreis-Indikator für Context-Füllstand + Token-Anzeige (current/max). Farben: blau (normal), orange (>80%), rot (>95%)
 - **Agent-Wechsel**: Erstellt automatisch eine neue Session für den gewählten Agent
 - **Context Compaction**: Automatisch bei 80% Context-Auslastung (Backend-seitig)
@@ -107,7 +107,8 @@ Der Chat zeigt den Agent-Loop in Echtzeit:
 
 Zeigt alle verfügbaren Modelle mit konfigurierbaren Einstellungen:
 
-- **Reasoning Default**: Default Reasoning-Level pro Model (off/low/medium/high/on)
+- **Reasoning Default**: Default Reasoning-Level pro Model (off/low/medium/high/xhigh)
+- **On/Off Checkbox**: Per-Model Toggle für Modelle die nur on/off Reasoning können (z.B. qwen) — Backend mappt automatisch
 - **Level-Config** (togglebar pro Model): Temperature und Max Output Tokens pro Reasoning-Level
 - **Compaction Prompt**: Opt-in Custom-Prompt für Context-Komprimierung (überschreibt Default, wird von Agent überschrieben)
 

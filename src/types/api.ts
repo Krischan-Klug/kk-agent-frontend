@@ -80,6 +80,7 @@ export interface ReasoningLevelConfig {
 
 export interface ModelSettings {
   reasoningEffort?: ReasoningEffort;
+  reasoningOnOff?: boolean;
   levels?: Record<string, ReasoningLevelConfig>;
   compactionPrompt?: string;
 }
@@ -106,7 +107,7 @@ export interface UpdateMcpBody {
 
 /* ── Agent ── */
 
-export type ReasoningEffort = "off" | "low" | "medium" | "high" | "on";
+export type ReasoningEffort = string;
 
 export interface AgentDefinition {
   id: string;

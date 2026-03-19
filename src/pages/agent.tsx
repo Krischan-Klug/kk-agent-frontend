@@ -9,6 +9,7 @@ import type {
   TransitionCondition,
   McpListItem,
 } from "@/types/api";
+import { REASONING_LEVELS } from "@/constants/reasoningDefaults";
 import { PageTitle } from "@/components/Layout.styled";
 import Card from "@/components/Card";
 import Badge from "@/components/Badge";
@@ -420,16 +421,14 @@ export default function AgentPage() {
                     onChange={(e) =>
                       setEditAgent({
                         ...editAgent,
-                        reasoningEffort: (e.target.value || undefined) as AgentDefinition["reasoningEffort"],
+                        reasoningEffort: e.target.value || undefined,
                       })
                     }
                   >
                     <option value="">-- Default --</option>
-                    <option value="off">Off</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="on">On</option>
+                    {REASONING_LEVELS.map((l) => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
                   </Select>
                 </div>
               </Row>
