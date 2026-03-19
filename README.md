@@ -94,12 +94,13 @@ Der Chat zeigt den Agent-Loop in Echtzeit:
 - **SSE-Events**: `content`, `reasoning`, `tool_call`, `tool_result`, `phase_change`, `loop_state`, `stats`, `done`, `error`
 - **Phase-Anzeige**: Aktuelle Phase und Iteration sichtbar während der Ausführung
 - **Tool-Cards**: Tool-Aufrufe und -Ergebnisse als aufklappbare Cards
-- **Reasoning-Cards**: `<think>`-Blöcke als togglebare Cards
+- **Reasoning-Cards**: persistierte `message.reasoning`-Bloecke bleiben waehrend des Streams und nach Abschluss sichtbar
 - **Reasoning-Select**: Reasoning-Level wählen (Off/Low/Med/High/XHigh) — wird als Session-Override gespeichert
 - **Temperature-Select**: Temperature wählen (0.0–2.0 in 0.1-Schritten) — wird als Session-Override gespeichert
 - **Context-Ring**: SVG-Kreis-Indikator für Context-Füllstand + Token-Anzeige (current/max). Farben: blau (normal), orange (>80%), rot (>95%)
 - **Agent-Wechsel**: Erstellt automatisch eine neue Session für den gewählten Agent
 - **Context Compaction**: Automatisch bei 80% Context-Auslastung (Backend-seitig)
+- **Tool-Protokoll**: Nur strukturierte `tool_calls` werden ausgefuehrt; pseudo-formatierte Tool-Aufrufe aus Thinking oder Text werden nicht heuristisch interpretiert
 
 ---
 

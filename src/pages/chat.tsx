@@ -653,17 +653,8 @@ export default function ChatPage() {
   }
 
   function renderMessage(msg: SessionMessage, idx: number) {
-    const hasThinkTags = msg.role === "assistant" && msg.content.includes("<think>");
-    let reasoning = "";
-    let content = msg.content;
-
-    if (hasThinkTags) {
-      const match = msg.content.match(/<think>([\s\S]*?)<\/think>/);
-      if (match) {
-        reasoning = match[1];
-        content = msg.content.replace(/<think>[\s\S]*?<\/think>/, "").trim();
-      }
-    }
+    const reasoning = msg.reasoning?.trim() ?? "";
+    const content = msg.content;
 
     if (msg.role === "tool") return null;
 
