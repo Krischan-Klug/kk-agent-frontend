@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import styled from "styled-components";
 import { session as sessionApi, provider as providerApi, mcp as mcpApi, agent as agentApi } from "@/lib/api";
-import type { SessionState, SessionMessage, StreamEvent, McpListItem, AgentDefinition, AgentLoopState, ModelInfo, ModelSettings, ReasoningEffort } from "@/types/api";
+import type { SessionState, SessionMessage, StreamEvent, McpListItem, AgentDefinition, AgentLoopState, ModelInfo, ModelSettings } from "@/types/api";
 import { REASONING_LEVELS } from "@/constants/reasoningDefaults";
 import Badge from "@/components/Badge";
 import Button from "@/components/Button";
@@ -41,36 +41,7 @@ const TopBarInfo = styled.div`
   color: var(--text-secondary);
 `;
 
-const PhaseBar = styled.div`
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-xs) 0;
-  margin-bottom: var(--space-sm);
-  font-size: var(--font-size-sm);
-  flex-shrink: 0;
-`;
-
-const PhaseDot = styled.span<{ $status: "completed" | "active" | "pending" }>`
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: ${(p) =>
-    p.$status === "completed"
-      ? "var(--success)"
-      : p.$status === "active"
-        ? "var(--accent)"
-        : "var(--border)"};
-  ${(p) =>
-    p.$status === "active" &&
-    `animation: pulse 1s infinite;
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
-    }`}
-`;
-
-const PhasePill = styled.span`
+const IterationPill = styled.span`
   padding: 1px var(--space-sm);
   background: var(--accent-muted);
   color: var(--accent);
@@ -78,6 +49,7 @@ const PhasePill = styled.span`
   font-size: 11px;
   font-weight: 500;
   font-family: var(--font-mono);
+  flex-shrink: 0;
 `;
 
 const Messages = styled.div`
@@ -90,6 +62,19 @@ const Messages = styled.div`
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
+`;
+
+const SystemNotice = styled.div`
+  align-self: center;
+  max-width: 720px;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
 `;
 
 const MessageBubble = styled.div<{ $role: string }>`
@@ -404,6 +389,8 @@ export default function ChatPage() {
   const [streamContent, setStreamContent] = useState("");
   const [streamReasoning, setStreamReasoning] = useState("");
   const [streamToolCalls, setStreamToolCalls] = useState<ActiveToolCall[]>([]);
+  const [streamCompactions, setStreamCompactions] = useState<SessionMessage[]>([]);
+  const [streamRetryNotices, setStreamRetryNotices] = useState<string[]>([]);
   const [loopState, setLoopState] = useState<AgentLoopState | null>(null);
   const [tokenStats, setTokenStats] = useState<{ input: number; output: number; reasoning: number } | null>(null);
 
@@ -448,15 +435,10 @@ export default function ChatPage() {
 
   useEffect(scrollToBottom, [session?.messages, streamContent, streamReasoning, streamToolCalls, scrollToBottom]);
 
-  // Get the current agent's phases for the phase bar
-  const currentAgent = agents.find((a) => a.id === session?.agentId);
-  const phases = currentAgent?.loopStrategy.phases ?? [];
-  const hasMultiplePhases = phases.length > 1;
-
   const reasoningLevels = REASONING_LEVELS;
 
   // Resolve effective reasoning effort: session override > model default > "medium"
-  const resolvedEffort: ReasoningEffort = session
+  const resolvedEffort: string = session
     ? (session.reasoningEffort ?? modelSettingsMap[session.model]?.reasoningEffort ?? "medium")
     : "medium";
 
@@ -476,6 +458,7 @@ export default function ChatPage() {
     setStreamContent("");
     setStreamReasoning("");
     setStreamToolCalls([]);
+    setStreamCompactions([]);
     setLoopState(null);
 
     // Optimistic: add user message
@@ -494,6 +477,9 @@ export default function ChatPage() {
           case "reasoning":
             setStreamReasoning((prev) => prev + event.content);
             break;
+          case "retry_notice":
+            setStreamRetryNotices((prev) => [...prev, event.message]);
+            break;
           case "tool_call":
             setStreamToolCalls((prev) => [
               ...prev,
@@ -509,9 +495,8 @@ export default function ChatPage() {
               ),
             );
             break;
-          case "phase_change":
-            setStreamContent("");
-            setStreamReasoning("");
+          case "compaction":
+            setStreamCompactions((prev) => [...prev, event.message]);
             break;
           case "loop_state":
             setLoopState(event.state);
@@ -525,12 +510,16 @@ export default function ChatPage() {
             setStreamContent("");
             setStreamReasoning("");
             setStreamToolCalls([]);
+            setStreamCompactions([]);
+            setStreamRetryNotices([]);
             setLoopState(null);
             window.dispatchEvent(new Event("session-changed"));
             break;
           case "error":
             console.error("Stream error:", event.message);
             setStreaming(false);
+            setStreamCompactions([]);
+            setStreamRetryNotices([]);
             setLoopState(null);
             break;
         }
@@ -538,6 +527,7 @@ export default function ChatPage() {
     } catch (err) {
       console.error(err);
       setStreaming(false);
+      setStreamCompactions([]);
       setLoopState(null);
     } finally {
       setSending(false);
@@ -657,6 +647,9 @@ export default function ChatPage() {
     const content = msg.content;
 
     if (msg.role === "tool") return null;
+    if (msg.role === "system" && msg.kind === "compaction") {
+      return <SystemNotice key={idx}>{content}</SystemNotice>;
+    }
 
     return (
       <MessageBubble key={idx} $role={msg.role}>
@@ -741,26 +734,6 @@ export default function ChatPage() {
         </Button>
       </TopBar>
 
-      {/* Phase indicator bar — only shown for multi-phase agents during streaming */}
-      {hasMultiplePhases && streaming && loopState && (
-        <PhaseBar>
-          {phases.map((phase) => {
-            const completed = loopState.phaseHistory.some((h) => h.phase === phase.name);
-            const active = loopState.currentPhase === phase.name;
-            return (
-              <PhaseDot
-                key={phase.name}
-                $status={completed ? "completed" : active ? "active" : "pending"}
-                title={phase.name}
-              />
-            );
-          })}
-          <PhasePill>
-            {loopState.currentPhase} ({loopState.phaseIteration}/{phases.find((p) => p.name === loopState.currentPhase)?.maxIterations ?? "?"})
-          </PhasePill>
-        </PhaseBar>
-      )}
-
       <Messages ref={messagesRef}>
         {session.messages.length === 0 && !streaming && (
           <EmptyState>
@@ -770,12 +743,25 @@ export default function ChatPage() {
 
         {session.messages.map(renderMessage)}
 
+        {streamCompactions.map((msg, idx) => (
+          <SystemNotice key={`stream-compaction-${idx}`}>{msg.content}</SystemNotice>
+        ))}
+
+        {streamRetryNotices.map((msg, idx) => (
+          <SystemNotice key={`stream-retry-${idx}`}>{msg}</SystemNotice>
+        ))}
+
         {/* Live streaming bubble */}
         {streaming && (streamContent || streamReasoning || streamToolCalls.length > 0) && (
           <MessageBubble $role="assistant">
             <RoleLabel>
               <Badge variant="info">assistant</Badge>
               <StreamingDot />
+              {loopState && (
+                <IterationPill>
+                  Iteration {loopState.iteration}/{loopState.maxIterations}
+                </IterationPill>
+              )}
             </RoleLabel>
 
             {streamReasoning && (

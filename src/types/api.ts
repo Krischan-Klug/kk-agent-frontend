@@ -15,8 +15,9 @@ export interface SessionState {
 }
 
 export interface SessionMessage {
-  role: "user" | "assistant" | "tool";
+  role: "user" | "assistant" | "tool" | "system";
   content: string;
+  kind?: "compaction";
   reasoning?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
@@ -115,110 +116,55 @@ export interface AgentDefinition {
   id: string;
   name: string;
   description: string;
-  loopStrategy: LoopStrategy;
-  promptTemplates: PromptTemplates;
+  systemPrompt: string;
+  maxIterations: number;
   mcpIds: string[];
   mcpInstructions: Record<string, string>;
   variables: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
   compactionPrompt?: string;
+  compactionThreshold?: number;
   createdAt: string;
   updatedAt: string;
 }
-
-export interface PromptTemplates {
-  base: string;
-  phases: Record<string, string>;
-}
-
-export interface LoopStrategy {
-  initialPhase: string;
-  maxTotalIterations: number;
-  phases: LoopPhase[];
-}
-
-export interface LoopPhase {
-  name: string;
-  description: string;
-  maxIterations: number;
-  toolFilter?: ToolFilter;
-  completionCriteria?: PhaseCompletionCriteria;
-  continueOnStop?: boolean;
-  transitions: PhaseTransition[];
-  autoAdvance: boolean;
-}
-
-export interface PhaseCompletionCriteria {
-  mode: "stop" | "signal";
-  signal?: string;
-  requiresToolCall?: boolean;
-}
-
-export interface ToolFilter {
-  mode: "include" | "exclude";
-  toolNames: string[];
-}
-
-export interface PhaseTransition {
-  to: string;
-  condition: TransitionCondition;
-}
-
-export type TransitionCondition =
-  | { type: "max_iterations" }
-  | { type: "no_tool_calls" }
-  | { type: "tool_called"; toolName: string }
-  | { type: "tool_result_error" }
-  | { type: "phase_complete" }
-  | { type: "keyword"; keyword: string }
-  | { type: "always" };
 
 export interface AgentLoopState {
   sessionId: string;
   agentId: string;
   status: "idle" | "running" | "completed" | "error";
-  currentPhase: string;
-  phaseIteration: number;
-  totalIteration: number;
-  phaseHistory: PhaseHistoryEntry[];
+  iteration: number;
+  maxIterations: number;
   startedAt: string;
   updatedAt: string;
-}
-
-export interface PhaseHistoryEntry {
-  phase: string;
-  iterations: number;
-  toolCallCount: number;
-  transitionReason: string;
-  startedAt: string;
-  endedAt: string;
 }
 
 export interface CreateAgentBody {
   name: string;
   description?: string;
-  loopStrategy: LoopStrategy;
-  promptTemplates: PromptTemplates;
+  systemPrompt?: string;
+  maxIterations?: number;
   mcpIds?: string[];
   mcpInstructions?: Record<string, string>;
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
   compactionPrompt?: string;
+  compactionThreshold?: number;
 }
 
 export interface UpdateAgentBody {
   name?: string;
   description?: string;
-  loopStrategy?: LoopStrategy;
-  promptTemplates?: PromptTemplates;
+  systemPrompt?: string;
+  maxIterations?: number;
   mcpIds?: string[];
   mcpInstructions?: Record<string, string>;
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
   compactionPrompt?: string;
+  compactionThreshold?: number;
 }
 
 /* ── Streaming ── */
@@ -226,9 +172,10 @@ export interface UpdateAgentBody {
 export type StreamEvent =
   | { type: "content"; content: string }
   | { type: "reasoning"; content: string }
+  | { type: "retry_notice"; message: string }
+  | { type: "compaction"; message: SessionMessage }
   | { type: "tool_call"; toolCall: { id: string; name: string; arguments: Record<string, unknown> } }
   | { type: "tool_result"; toolCallId: string; content: string; isError: boolean }
-  | { type: "phase_change"; from: string; to: string; reason: string }
   | { type: "loop_state"; state: AgentLoopState }
   | { type: "stats"; inputTokens: number; outputTokens: number; reasoningTokens: number }
   | { type: "done"; session: SessionState }

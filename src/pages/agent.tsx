@@ -4,9 +4,6 @@ import { agent as agentApi, mcp as mcpApi } from "@/lib/api";
 import type {
   AgentDefinition,
   CreateAgentBody,
-  LoopPhase,
-  PhaseTransition,
-  TransitionCondition,
   McpListItem,
 } from "@/types/api";
 import { REASONING_LEVELS } from "@/constants/reasoningDefaults";
@@ -19,8 +16,6 @@ import TextArea from "@/components/TextArea";
 import Modal from "@/components/Modal";
 import Spinner from "@/components/Spinner";
 import Toggle from "@/components/Toggle";
-import PhaseGraph from "@/components/PhaseGraph";
-import LoopStateViewer from "@/components/LoopStateViewer";
 
 /* ── Styled ── */
 
@@ -117,21 +112,6 @@ const Select = styled.select`
   }
 `;
 
-const PhaseEditorPanel = styled.div`
-  padding: var(--space-md);
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-`;
-
-const TransitionRow = styled.div`
-  display: flex;
-  gap: var(--space-sm);
-  align-items: center;
-  padding: var(--space-xs) 0;
-  font-size: var(--font-size-sm);
-`;
-
 const CheckboxRow = styled.label`
   display: flex;
   align-items: center;
@@ -159,38 +139,6 @@ const Actions = styled.div`
   gap: var(--space-sm);
 `;
 
-/* ── Helpers ── */
-
-function emptyPhase(name = "new-phase"): LoopPhase {
-  return {
-    name,
-    description: "",
-    maxIterations: 5,
-    completionCriteria: { mode: "stop" },
-    continueOnStop: false,
-    transitions: [],
-    autoAdvance: true,
-  };
-}
-
-function emptyTransition(phases: LoopPhase[], currentPhaseName: string): PhaseTransition {
-  const other = phases.find((p) => p.name !== currentPhaseName);
-  return {
-    to: other?.name ?? "",
-    condition: { type: "no_tool_calls" },
-  };
-}
-
-const CONDITION_TYPES: { value: TransitionCondition["type"]; label: string }[] = [
-  { value: "no_tool_calls", label: "No Tool Calls" },
-  { value: "max_iterations", label: "Max Iterations" },
-  { value: "tool_called", label: "Tool Called" },
-  { value: "tool_result_error", label: "Tool Result Error" },
-  { value: "phase_complete", label: "Phase Complete" },
-  { value: "keyword", label: "Keyword" },
-  { value: "always", label: "Always" },
-];
-
 /* ── Component ── */
 
 export default function AgentPage() {
@@ -199,7 +147,6 @@ export default function AgentPage() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editAgent, setEditAgent] = useState<AgentDefinition | null>(null);
-  const [selectedPhase, setSelectedPhase] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -222,7 +169,6 @@ export default function AgentPage() {
     if (ag) {
       setSelectedId(id);
       setEditAgent(structuredClone(ag));
-      setSelectedPhase(null);
     }
   }
 
@@ -231,16 +177,6 @@ export default function AgentPage() {
     try {
       const body: CreateAgentBody = {
         name: newName.trim(),
-        description: "",
-        loopStrategy: {
-          initialPhase: "respond",
-          maxTotalIterations: 10,
-          phases: [emptyPhase("respond")],
-        },
-        promptTemplates: { base: "", phases: {} },
-        mcpIds: [],
-        mcpInstructions: {},
-        variables: {},
       };
       const created = await agentApi.create(body);
       setAgents((prev) => [...prev, created]);
@@ -260,14 +196,15 @@ export default function AgentPage() {
       const updated = await agentApi.update(selectedId, {
         name: editAgent.name,
         description: editAgent.description,
-        loopStrategy: editAgent.loopStrategy,
-        promptTemplates: editAgent.promptTemplates,
+        systemPrompt: editAgent.systemPrompt,
+        maxIterations: editAgent.maxIterations,
         mcpIds: editAgent.mcpIds,
         mcpInstructions: editAgent.mcpInstructions,
         variables: editAgent.variables,
         defaultModel: editAgent.defaultModel,
         reasoningEffort: editAgent.reasoningEffort,
         compactionPrompt: editAgent.compactionPrompt,
+        compactionThreshold: editAgent.compactionThreshold,
       });
       setAgents((prev) => prev.map((a) => (a.id === selectedId ? updated : a)));
       setEditAgent(structuredClone(updated));
@@ -295,84 +232,6 @@ export default function AgentPage() {
     }
   }
 
-  function updatePhase(name: string, update: Partial<LoopPhase>) {
-    if (!editAgent) return;
-    const phases = editAgent.loopStrategy.phases.map((p) =>
-      p.name === name ? { ...p, ...update } : p,
-    );
-    setEditAgent({
-      ...editAgent,
-      loopStrategy: { ...editAgent.loopStrategy, phases },
-    });
-  }
-
-  function addPhase() {
-    if (!editAgent) return;
-    const name = `phase-${editAgent.loopStrategy.phases.length + 1}`;
-    setEditAgent({
-      ...editAgent,
-      loopStrategy: {
-        ...editAgent.loopStrategy,
-        phases: [...editAgent.loopStrategy.phases, emptyPhase(name)],
-      },
-    });
-    setSelectedPhase(name);
-  }
-
-  function removePhase(name: string) {
-    if (!editAgent) return;
-    const phases = editAgent.loopStrategy.phases.filter((p) => p.name !== name);
-    // Remove transitions pointing to this phase
-    const cleaned = phases.map((p) => ({
-      ...p,
-      transitions: p.transitions.filter((t) => t.to !== name),
-    }));
-    const newInitial = editAgent.loopStrategy.initialPhase === name
-      ? (cleaned[0]?.name ?? "")
-      : editAgent.loopStrategy.initialPhase;
-    setEditAgent({
-      ...editAgent,
-      loopStrategy: { ...editAgent.loopStrategy, phases: cleaned, initialPhase: newInitial },
-    });
-    if (selectedPhase === name) setSelectedPhase(null);
-  }
-
-  function addTransition(phaseName: string) {
-    if (!editAgent) return;
-    const phase = editAgent.loopStrategy.phases.find((p) => p.name === phaseName);
-    if (!phase) return;
-    updatePhase(phaseName, {
-      transitions: [...phase.transitions, emptyTransition(editAgent.loopStrategy.phases, phaseName)],
-    });
-  }
-
-  function updateTransition(phaseName: string, index: number, update: Partial<PhaseTransition>) {
-    if (!editAgent) return;
-    const phase = editAgent.loopStrategy.phases.find((p) => p.name === phaseName);
-    if (!phase) return;
-    const transitions = phase.transitions.map((t, i) => (i === index ? { ...t, ...update } : t));
-    updatePhase(phaseName, { transitions });
-  }
-
-  function removeTransition(phaseName: string, index: number) {
-    if (!editAgent) return;
-    const phase = editAgent.loopStrategy.phases.find((p) => p.name === phaseName);
-    if (!phase) return;
-    updatePhase(phaseName, { transitions: phase.transitions.filter((_, i) => i !== index) });
-  }
-
-  function updateCondition(phaseName: string, tIndex: number, type: TransitionCondition["type"]) {
-    let condition: TransitionCondition;
-    switch (type) {
-      case "tool_called": condition = { type: "tool_called", toolName: "" }; break;
-      case "keyword": condition = { type: "keyword", keyword: "" }; break;
-      default: condition = { type } as TransitionCondition;
-    }
-    updateTransition(phaseName, tIndex, { condition });
-  }
-
-  const activePhase = editAgent?.loopStrategy.phases.find((p) => p.name === selectedPhase);
-
   if (loading) return <Spinner />;
 
   return (
@@ -390,7 +249,7 @@ export default function AgentPage() {
               <AgentName>{a.name}</AgentName>
               {a.description && <AgentDesc>{a.description}</AgentDesc>}
               <AgentMeta>
-                <Badge variant="info">{a.loopStrategy.phases.length} Phasen</Badge>
+                <Badge variant="info">{a.maxIterations} Iterationen</Badge>
                 {a.mcpIds.length > 0 && <Badge variant="success">{a.mcpIds.length} MCPs</Badge>}
               </AgentMeta>
             </AgentCard>
@@ -436,6 +295,67 @@ export default function AgentPage() {
                   </Select>
                 </div>
               </Row>
+            </Section>
+
+            {/* Iteration */}
+            <Section>
+              <SectionTitle>Iteration</SectionTitle>
+              <Row>
+                <div>
+                  <FieldLabel>Max Iterationen</FieldLabel>
+                  <Input
+                    type="number"
+                    value={editAgent.maxIterations}
+                    onChange={(e) =>
+                      setEditAgent({
+                        ...editAgent,
+                        maxIterations: parseInt(e.target.value) || 10,
+                      })
+                    }
+                    style={{ width: 80 }}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Compaction Threshold</FieldLabel>
+                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
+                    <input
+                      type="range"
+                      min={50}
+                      max={95}
+                      step={5}
+                      value={Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}
+                      onChange={(e) =>
+                        setEditAgent({
+                          ...editAgent,
+                          compactionThreshold: parseInt(e.target.value) / 100,
+                        })
+                      }
+                      style={{ width: 120, accentColor: "var(--accent)" }}
+                    />
+                    <span style={{ fontSize: "var(--font-size-sm)", fontFamily: "var(--font-mono)", minWidth: 36 }}>
+                      {Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}%
+                    </span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, paddingTop: 18 }}>
+                  <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
+                    Der Agent iteriert (LLM → Tools → repeat) bis keine Tool-Calls mehr kommen oder das Limit erreicht ist. Bei {Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}% Context-Auslastung wird der bisherige Verlauf komprimiert.
+                  </span>
+                </div>
+              </Row>
+            </Section>
+
+            {/* System Prompt */}
+            <Section>
+              <SectionTitle>System Prompt</SectionTitle>
+              <TextArea
+                value={editAgent.systemPrompt}
+                onChange={(e) =>
+                  setEditAgent({ ...editAgent, systemPrompt: e.target.value })
+                }
+                rows={15}
+                placeholder="Der System-Prompt für diesen Agent..."
+              />
             </Section>
 
             {/* MCP Configuration */}
@@ -526,7 +446,7 @@ export default function AgentPage() {
             <Section>
               <SectionTitle>Variablen</SectionTitle>
               <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
-                System-Variablen sind automatisch verfügbar: <code>{"{{CURRENT_DATE}}"}</code>, <code>{"{{CURRENT_TIME}}"}</code>, <code>{"{{phase}}"}</code>, <code>{"{{iteration}}"}</code>, <code>{"{{maxIterations}}"}</code>
+                System-Variablen: <code>{"{{CURRENT_DATE}}"}</code>, <code>{"{{CURRENT_TIME}}"}</code>, <code>{"{{iteration}}"}</code>, <code>{"{{maxIterations}}"}</code>
               </span>
               {Object.entries(editAgent.variables).map(([key, value]) => (
                 <Row key={key} style={{ alignItems: "center" }}>
@@ -579,25 +499,6 @@ export default function AgentPage() {
               </Button>
             </Section>
 
-            {/* Prompt Templates */}
-            <Section>
-              <SectionTitle>Prompts</SectionTitle>
-              <div>
-                <FieldLabel>Base System Prompt</FieldLabel>
-                <TextArea
-                  value={editAgent.promptTemplates.base}
-                  onChange={(e) =>
-                    setEditAgent({
-                      ...editAgent,
-                      promptTemplates: { ...editAgent.promptTemplates, base: e.target.value },
-                    })
-                  }
-                  rows={15}
-                  placeholder="Der Basis-System-Prompt für diesen Agent..."
-                />
-              </div>
-            </Section>
-
             {/* Compaction Prompt (opt-in) */}
             <Section>
               <SectionTitle>
@@ -628,255 +529,6 @@ export default function AgentPage() {
               )}
             </Section>
 
-            {/* Loop Strategy */}
-            <Section>
-              <SectionTitle>Loop Strategy</SectionTitle>
-              <Row>
-                <div>
-                  <FieldLabel>Max Total Iterations</FieldLabel>
-                  <Input
-                    type="number"
-                    value={editAgent.loopStrategy.maxTotalIterations}
-                    onChange={(e) =>
-                      setEditAgent({
-                        ...editAgent,
-                        loopStrategy: {
-                          ...editAgent.loopStrategy,
-                          maxTotalIterations: parseInt(e.target.value) || 10,
-                        },
-                      })
-                    }
-                    style={{ width: 80 }}
-                  />
-                </div>
-                <div>
-                  <FieldLabel>Initial Phase</FieldLabel>
-                  <Select
-                    value={editAgent.loopStrategy.initialPhase}
-                    onChange={(e) =>
-                      setEditAgent({
-                        ...editAgent,
-                        loopStrategy: { ...editAgent.loopStrategy, initialPhase: e.target.value },
-                      })
-                    }
-                  >
-                    {editAgent.loopStrategy.phases.map((p) => (
-                      <option key={p.name} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
-                <div style={{ marginTop: 18 }}>
-                  <Button size="sm" onClick={addPhase}>
-                    Phase hinzufügen
-                  </Button>
-                </div>
-              </Row>
-
-              {/* Phase Graph */}
-              <PhaseGraph
-                phases={editAgent.loopStrategy.phases}
-                initialPhase={editAgent.loopStrategy.initialPhase}
-                selectedPhase={selectedPhase}
-                onSelectPhase={setSelectedPhase}
-              />
-
-              {/* Selected Phase Editor */}
-              {activePhase && (
-                <PhaseEditorPanel>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-sm)" }}>
-                    <SectionTitle>Phase: {activePhase.name}</SectionTitle>
-                    <Button size="sm" variant="danger" onClick={() => removePhase(activePhase.name)}>
-                      Entfernen
-                    </Button>
-                  </div>
-                  <Row>
-                    <div>
-                      <FieldLabel>Name</FieldLabel>
-                      <Input
-                        value={activePhase.name}
-                        onChange={(e) => {
-                          const oldName = activePhase.name;
-                          const newName = e.target.value;
-                          // Rename in transitions
-                          const phases = editAgent.loopStrategy.phases.map((p) => {
-                            const renamed = p.name === oldName ? { ...p, name: newName } : p;
-                            return {
-                              ...renamed,
-                              transitions: renamed.transitions.map((t) =>
-                                t.to === oldName ? { ...t, to: newName } : t,
-                              ),
-                            };
-                          });
-                          const newInitial = editAgent.loopStrategy.initialPhase === oldName ? newName : editAgent.loopStrategy.initialPhase;
-                          setEditAgent({
-                            ...editAgent,
-                            loopStrategy: { ...editAgent.loopStrategy, phases, initialPhase: newInitial },
-                            promptTemplates: {
-                              ...editAgent.promptTemplates,
-                              phases: Object.fromEntries(
-                                Object.entries(editAgent.promptTemplates.phases).map(([k, v]) =>
-                                  [k === oldName ? newName : k, v],
-                                ),
-                              ),
-                            },
-                          });
-                          setSelectedPhase(newName);
-                        }}
-                        style={{ width: 120 }}
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Max Iterations</FieldLabel>
-                      <Input
-                        type="number"
-                        value={activePhase.maxIterations}
-                        onChange={(e) => updatePhase(activePhase.name, { maxIterations: parseInt(e.target.value) || 5 })}
-                        style={{ width: 80 }}
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Auto Advance</FieldLabel>
-                      <Toggle
-                        checked={activePhase.autoAdvance}
-                        onChange={() => updatePhase(activePhase.name, { autoAdvance: !activePhase.autoAdvance })}
-                      />
-                    </div>
-                    <div>
-                      <FieldLabel>Continue On Stop</FieldLabel>
-                      <Toggle
-                        checked={activePhase.continueOnStop ?? false}
-                        onChange={() => updatePhase(activePhase.name, { continueOnStop: !(activePhase.continueOnStop ?? false) })}
-                      />
-                    </div>
-                  </Row>
-                  <Row>
-                    <div>
-                      <FieldLabel>Completion Mode</FieldLabel>
-                      <Select
-                        value={activePhase.completionCriteria?.mode ?? "stop"}
-                        onChange={(e) =>
-                          updatePhase(activePhase.name, {
-                            completionCriteria: e.target.value === "signal"
-                              ? { mode: "signal", signal: activePhase.completionCriteria?.signal ?? "" }
-                              : { mode: "stop" },
-                          })
-                        }
-                      >
-                        <option value="stop">Stop</option>
-                        <option value="signal">Signal</option>
-                      </Select>
-                    </div>
-                    {activePhase.completionCriteria?.mode === "signal" && (
-                      <div style={{ flex: 1 }}>
-                        <FieldLabel>Completion Signal</FieldLabel>
-                        <Input
-                          value={activePhase.completionCriteria.signal ?? ""}
-                          onChange={(e) =>
-                            updatePhase(activePhase.name, {
-                              completionCriteria: {
-                                ...activePhase.completionCriteria,
-                                mode: "signal",
-                                signal: e.target.value,
-                              },
-                            })
-                          }
-                          placeholder="PHASE_COMPLETE: EXECUTE"
-                        />
-                      </div>
-                    )}
-                  </Row>
-                  {/* Transitions */}
-                  <div style={{ marginTop: "var(--space-md)" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <FieldLabel>Transitions</FieldLabel>
-                      <Button size="sm" variant="secondary" onClick={() => addTransition(activePhase.name)}>
-                        + Transition
-                      </Button>
-                    </div>
-                    {activePhase.transitions.map((t, ti) => (
-                      <TransitionRow key={ti}>
-                        <Select
-                          value={t.condition.type}
-                          onChange={(e) => updateCondition(activePhase.name, ti, e.target.value as TransitionCondition["type"])}
-                        >
-                          {CONDITION_TYPES.map((ct) => (
-                            <option key={ct.value} value={ct.value}>
-                              {ct.label}
-                            </option>
-                          ))}
-                        </Select>
-                        {t.condition.type === "tool_called" && (
-                          <Select
-                            value={(t.condition as { toolName: string }).toolName}
-                            onChange={(e) => updateTransition(activePhase.name, ti, { condition: { type: "tool_called", toolName: e.target.value } })}
-                          >
-                            <option value="">-- Tool --</option>
-                            {mcps
-                              .filter((m) => editAgent.mcpIds.includes(m.id))
-                              .flatMap((m) => m.tools)
-                              .map((tool) => (
-                                <option key={tool.name} value={tool.name}>{tool.name}</option>
-                              ))}
-                          </Select>
-                        )}
-                        {t.condition.type === "keyword" && (
-                          <Input
-                            value={(t.condition as { keyword: string }).keyword}
-                            onChange={(e) => updateTransition(activePhase.name, ti, { condition: { type: "keyword", keyword: e.target.value } })}
-                            placeholder="Keyword"
-                            style={{ width: 120 }}
-                          />
-                        )}
-                        <span style={{ color: "var(--text-muted)" }}>→</span>
-                        <Select
-                          value={t.to}
-                          onChange={(e) => updateTransition(activePhase.name, ti, { to: e.target.value })}
-                        >
-                          <option value="">-- Ziel --</option>
-                          {editAgent.loopStrategy.phases
-                            .filter((p) => p.name !== activePhase.name)
-                            .map((p) => (
-                              <option key={p.name} value={p.name}>
-                                {p.name}
-                              </option>
-                            ))}
-                        </Select>
-                        <Button size="sm" variant="danger" onClick={() => removeTransition(activePhase.name, ti)}>
-                          x
-                        </Button>
-                      </TransitionRow>
-                    ))}
-                    {activePhase.transitions.length === 0 && (
-                      <span style={{ color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>
-                        Keine Transitions (Phase endet wenn LLM fertig ist)
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Phase Prompt */}
-                  <div style={{ marginTop: "var(--space-md)" }}>
-                    <FieldLabel>Prompt-Erweiterung</FieldLabel>
-                    <TextArea
-                      value={editAgent.promptTemplates.phases[activePhase.name] ?? ""}
-                      onChange={(e) =>
-                        setEditAgent({
-                          ...editAgent,
-                          promptTemplates: {
-                            ...editAgent.promptTemplates,
-                            phases: { ...editAgent.promptTemplates.phases, [activePhase.name]: e.target.value },
-                          },
-                        })
-                      }
-                      rows={15}
-                      placeholder={`Phasen-spezifische Prompt-Erweiterung für "${activePhase.name}"...`}
-                    />
-                  </div>
-                </PhaseEditorPanel>
-              )}
-            </Section>
-
             {/* Actions */}
             <Actions>
               <Button onClick={handleSave} disabled={saving}>
@@ -886,12 +538,6 @@ export default function AgentPage() {
                 Agent löschen
               </Button>
             </Actions>
-
-            {/* Live Loop Viewer */}
-            <LoopStateViewer
-              agentId={editAgent.id}
-              phases={editAgent.loopStrategy.phases}
-            />
           </EditorArea>
         ) : (
           <EditorArea>
