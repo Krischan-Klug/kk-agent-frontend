@@ -13,12 +13,12 @@ import {
 } from "./Sidebar.styled";
 
 const navItems = [
-  { href: "/chat", label: "Chat" },
-  { href: "/session", label: "Sessions" },
-  { href: "/agent", label: "Agents" },
-  { href: "/mcp", label: "MCP" },
-  { href: "/provider", label: "Provider" },
-  { href: "/settings", label: "Settings" },
+  { href: "/chat", label: "💬 Chat" },
+  { href: "/session", label: "📂 Sessions" },
+  { href: "/agent", label: "🤖 Agents" },
+  { href: "/mcp", label: "🛠️ MCP" },
+  { href: "/provider", label: "🔌 Provider" },
+  { href: "/settings/defaults", label: "⚙️ Settings" },
 ];
 
 export default function Sidebar() {
@@ -66,8 +66,9 @@ export default function Sidebar() {
         <Link key={item.href} href={item.href} style={{ textDecoration: "none" }}>
           <NavItem
             $active={
-              router.pathname === item.href ||
-              (item.href === "/chat" && router.pathname === "/")
+              (item.href === "/chat" && (router.pathname === "/" || router.pathname === "/chat")) ||
+              (item.href.startsWith("/settings") && router.pathname.startsWith("/settings")) ||
+              (item.href !== "/chat" && !item.href.startsWith("/settings") && router.pathname === item.href)
             }
           >
             {item.label}

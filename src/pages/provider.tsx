@@ -239,7 +239,7 @@ export default function ProviderPage() {
                         onChange={(e) => saveSettings(m.id, { ...settings, reasoningOnOff: e.target.checked || undefined })}
                         style={{ accentColor: "var(--accent)" }}
                       />
-                      On/Off
+                      🧠 On/Off-Mapping
                     </label>
                     <Label>Default:</Label>
                     <Select
