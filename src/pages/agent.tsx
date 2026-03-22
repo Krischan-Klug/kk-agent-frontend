@@ -250,7 +250,14 @@ export default function AgentPage() {
               {a.description && <AgentDesc>{a.description}</AgentDesc>}
               <AgentMeta>
                 <Badge variant="info">{a.maxIterations} Iterationen</Badge>
-                {a.mcpIds.length > 0 && <Badge variant="success">{a.mcpIds.length} MCPs</Badge>}
+                {a.mcpIds.length > 0 && (
+                  <Badge variant="success">
+                    {a.mcpIds.map((id) => {
+                      const m = mcps.find((mc) => mc.id === id);
+                      return m?.emoji || "🛠️";
+                    }).join("")}
+                  </Badge>
+                )}
               </AgentMeta>
             </AgentCard>
           ))}
@@ -259,9 +266,9 @@ export default function AgentPage() {
         {/* Editor Area */}
         {editAgent ? (
           <EditorArea>
-            {/* Basic Info */}
+            {/* 📋 Agent Info */}
             <Section>
-              <SectionTitle>Agent Info</SectionTitle>
+              <SectionTitle>📋 Agent Info</SectionTitle>
               <Row>
                 <div style={{ flex: 1 }}>
                   <FieldLabel>Name</FieldLabel>
@@ -297,9 +304,22 @@ export default function AgentPage() {
               </Row>
             </Section>
 
-            {/* Iteration */}
+            {/* 📝 System Prompt */}
             <Section>
-              <SectionTitle>Iteration</SectionTitle>
+              <SectionTitle>📝 System Prompt</SectionTitle>
+              <TextArea
+                value={editAgent.systemPrompt}
+                onChange={(e) =>
+                  setEditAgent({ ...editAgent, systemPrompt: e.target.value })
+                }
+                rows={15}
+                placeholder="Der System-Prompt für diesen Agent..."
+              />
+            </Section>
+
+            {/* 🔄 Iteration & Compaction */}
+            <Section>
+              <SectionTitle>🔄 Iteration & Compaction</SectionTitle>
               <Row>
                 <div>
                   <FieldLabel>Max Iterationen</FieldLabel>
@@ -343,108 +363,108 @@ export default function AgentPage() {
                   </span>
                 </div>
               </Row>
+              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer", fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", marginTop: "var(--space-sm)" }}>
+                <input
+                  type="checkbox"
+                  checked={editAgent.compactionPrompt != null}
+                  onChange={(e) =>
+                    setEditAgent({
+                      ...editAgent,
+                      compactionPrompt: e.target.checked ? "" : undefined,
+                    })
+                  }
+                  style={{ accentColor: "var(--accent)" }}
+                />
+                Custom Compaction Prompt
+              </label>
+              {editAgent.compactionPrompt != null && (
+                <TextArea
+                  value={editAgent.compactionPrompt}
+                  onChange={(e) => setEditAgent({ ...editAgent, compactionPrompt: e.target.value })}
+                  rows={8}
+                  placeholder="Überschreibt den Default-Compaction-Prompt für diesen Agent..."
+                />
+              )}
             </Section>
 
-            {/* System Prompt */}
+            {/* 🔧 MCP-Tools */}
             <Section>
-              <SectionTitle>System Prompt</SectionTitle>
-              <TextArea
-                value={editAgent.systemPrompt}
-                onChange={(e) =>
-                  setEditAgent({ ...editAgent, systemPrompt: e.target.value })
-                }
-                rows={15}
-                placeholder="Der System-Prompt für diesen Agent..."
-              />
-            </Section>
-
-            {/* MCP Configuration */}
-            <Section>
-              <SectionTitle>MCPs</SectionTitle>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-sm)" }}>
-                {mcps.map((m) => (
-                  <CheckboxRow key={m.id}>
-                    <input
-                      type="checkbox"
-                      checked={editAgent.mcpIds.includes(m.id)}
-                      onChange={() => {
-                        const newIds = editAgent.mcpIds.includes(m.id)
-                          ? editAgent.mcpIds.filter((id) => id !== m.id)
-                          : [...editAgent.mcpIds, m.id];
-                        setEditAgent({ ...editAgent, mcpIds: newIds });
-                      }}
-                    />
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "50%",
-                        background: m.running ? "var(--success)" : "var(--danger)",
-                        flexShrink: 0,
-                      }}
-                    />
-                    {m.name}
-                    {!m.running && (
-                      <span style={{ color: "var(--danger)", fontSize: "0.7rem" }}>(stopped)</span>
-                    )}
-                  </CheckboxRow>
-                ))}
-              </div>
-
-              {/* Agent-specific MCP Instructions */}
-              {editAgent.mcpIds.length > 0 && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
-                  <FieldLabel>MCP Instructions</FieldLabel>
-                  {editAgent.mcpIds.map((mcpId) => {
-                    const mcpItem = mcps.find((m) => m.id === mcpId);
-                    const isOverridden = mcpId in editAgent.mcpInstructions;
-                    return (
-                      <McpInstructionRow key={mcpId}>
-                        <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
-                          <span style={{ fontSize: "var(--font-size-sm)", fontWeight: 500 }}>
-                            {mcpItem?.name ?? mcpId}
-                          </span>
+              <SectionTitle>🔧 MCP-Tools</SectionTitle>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+                {mcps.map((m) => {
+                  const isActive = editAgent.mcpIds.includes(m.id);
+                  const isOverridden = m.id in editAgent.mcpInstructions;
+                  return (
+                    <McpInstructionRow key={m.id} style={{ opacity: isActive ? 1 : 0.5 }}>
+                      <Row style={{ justifyContent: "space-between", alignItems: "center" }}>
+                        <CheckboxRow>
+                          <input
+                            type="checkbox"
+                            checked={isActive}
+                            onChange={() => {
+                              const newIds = isActive
+                                ? editAgent.mcpIds.filter((id) => id !== m.id)
+                                : [...editAgent.mcpIds, m.id];
+                              setEditAgent({ ...editAgent, mcpIds: newIds });
+                            }}
+                          />
+                          <span style={{ fontSize: "1.1em" }}>{m.emoji || "🛠️"}</span>
+                          <span style={{ fontWeight: 500 }}>{m.name}</span>
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: m.running ? "var(--success)" : "var(--danger)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {!m.running && (
+                            <span style={{ color: "var(--danger)", fontSize: "0.7rem" }}>stopped</span>
+                          )}
+                        </CheckboxRow>
+                        {isActive && (
                           <Row style={{ alignItems: "center", gap: "var(--space-xs)" }}>
                             <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
-                              Überschreiben
+                              Instruction überschreiben
                             </span>
                             <Toggle
                               checked={isOverridden}
                               onChange={() => {
                                 const newInstr = { ...editAgent.mcpInstructions };
                                 if (isOverridden) {
-                                  delete newInstr[mcpId];
+                                  delete newInstr[m.id];
                                 } else {
-                                  newInstr[mcpId] = "";
+                                  newInstr[m.id] = "";
                                 }
                                 setEditAgent({ ...editAgent, mcpInstructions: newInstr });
                               }}
                             />
                           </Row>
-                        </Row>
-                        {isOverridden && (
-                          <TextArea
-                            value={editAgent.mcpInstructions[mcpId] ?? ""}
-                            onChange={(e) =>
-                              setEditAgent({
-                                ...editAgent,
-                                mcpInstructions: { ...editAgent.mcpInstructions, [mcpId]: e.target.value },
-                              })
-                            }
-                            rows={2}
-                            placeholder="Leer = MCP-Instruction komplett unterdrücken"
-                          />
                         )}
-                      </McpInstructionRow>
-                    );
-                  })}
-                </div>
-              )}
+                      </Row>
+                      {isActive && isOverridden && (
+                        <TextArea
+                          value={editAgent.mcpInstructions[m.id] ?? ""}
+                          onChange={(e) =>
+                            setEditAgent({
+                              ...editAgent,
+                              mcpInstructions: { ...editAgent.mcpInstructions, [m.id]: e.target.value },
+                            })
+                          }
+                          rows={2}
+                          placeholder="Leer = MCP-Instruction komplett unterdrücken"
+                        />
+                      )}
+                    </McpInstructionRow>
+                  );
+                })}
+              </div>
             </Section>
 
-            {/* Variables */}
+            {/* 📐 Variablen */}
             <Section>
-              <SectionTitle>Variablen</SectionTitle>
+              <SectionTitle>📐 Variablen</SectionTitle>
               <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
                 System-Variablen: <code>{"{{CURRENT_DATE}}"}</code>, <code>{"{{CURRENT_TIME}}"}</code>, <code>{"{{iteration}}"}</code>, <code>{"{{maxIterations}}"}</code>
               </span>
@@ -497,36 +517,6 @@ export default function AgentPage() {
               >
                 + Variable
               </Button>
-            </Section>
-
-            {/* Compaction Prompt (opt-in) */}
-            <Section>
-              <SectionTitle>
-                <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={editAgent.compactionPrompt != null}
-                    onChange={(e) =>
-                      setEditAgent({
-                        ...editAgent,
-                        compactionPrompt: e.target.checked ? "" : undefined,
-                      })
-                    }
-                    style={{ accentColor: "var(--accent)" }}
-                  />
-                  Custom Compaction Prompt
-                </label>
-              </SectionTitle>
-              {editAgent.compactionPrompt != null && (
-                <div>
-                  <TextArea
-                    value={editAgent.compactionPrompt}
-                    onChange={(e) => setEditAgent({ ...editAgent, compactionPrompt: e.target.value })}
-                    rows={8}
-                    placeholder="Überschreibt den Default-Compaction-Prompt für diesen Agent..."
-                  />
-                </div>
-              )}
             </Section>
 
             {/* Actions */}

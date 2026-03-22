@@ -43,6 +43,7 @@ export interface McpServerConfig {
   name: string;
   active: boolean;
   instruction: string;
+  emoji?: string;
   transport: "stdio" | "sse";
   server: McpStdioConfig | McpSseConfig;
 }
@@ -96,6 +97,7 @@ export interface CreateMcpBody {
   env?: Record<string, string>;
   url?: string;
   instruction?: string;
+  emoji?: string;
 }
 
 export interface UpdateMcpBody {
@@ -106,6 +108,7 @@ export interface UpdateMcpBody {
   env?: Record<string, string>;
   url?: string;
   instruction?: string;
+  emoji?: string;
 }
 
 /* ── Agent ── */
@@ -165,6 +168,28 @@ export interface UpdateAgentBody {
   reasoningEffort?: ReasoningEffort;
   compactionPrompt?: string;
   compactionThreshold?: number;
+}
+
+/* ── Defaults ── */
+
+export interface AppDefaults {
+  agent: {
+    systemPrompt: string;
+    maxIterations: number;
+    compactionThreshold: number;
+  };
+  compaction: {
+    prompt: string;
+    postInstruction: string;
+  };
+  retry: {
+    emptyResponseInstruction: string;
+    invalidToolInstruction: string;
+    lengthInstruction: string;
+  };
+  reasoning: {
+    defaultEffort: string;
+  };
 }
 
 /* ── Streaming ── */

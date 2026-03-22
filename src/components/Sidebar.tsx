@@ -18,6 +18,7 @@ const navItems = [
   { href: "/agent", label: "Agents" },
   { href: "/mcp", label: "MCP" },
   { href: "/provider", label: "Provider" },
+  { href: "/settings", label: "Settings" },
 ];
 
 export default function Sidebar() {

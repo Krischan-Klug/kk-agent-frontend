@@ -12,6 +12,7 @@ import type {
   CreateAgentBody,
   UpdateAgentBody,
   ModelSettings,
+  AppDefaults,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -146,6 +147,16 @@ export const agent = {
 
     return () => controller.abort();
   },
+};
+
+export const settings = {
+  getDefaults: () => request<AppDefaults>("/settings/defaults"),
+
+  updateDefaults: (body: Partial<AppDefaults>) =>
+    request<AppDefaults>("/settings/defaults", {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
 };
 
 export const session = {

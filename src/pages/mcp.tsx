@@ -153,7 +153,7 @@ export default function McpPage() {
   const [expandedInstructions, setExpandedInstructions] = useState<Set<string>>(new Set());
   const [expandedEdit, setExpandedEdit] = useState<Set<string>>(new Set());
   const [editForms, setEditForms] = useState<
-    Record<string, { name: string; command: string; args: string; url: string; env: Record<string, string> }>
+    Record<string, { name: string; emoji: string; command: string; args: string; url: string; env: Record<string, string> }>
   >({});
 
   // Create modal
@@ -219,6 +219,7 @@ export default function McpPage() {
       await mcpApi.create({
         name: createForm.name,
         transport: createForm.transport,
+        emoji: createForm.emoji || undefined,
         command: createForm.transport === "stdio" ? createForm.command : undefined,
         args:
           createForm.transport === "stdio" && createForm.args?.length
@@ -229,7 +230,7 @@ export default function McpPage() {
         instruction: createForm.instruction || undefined,
       });
       setShowCreate(false);
-      setCreateForm({ name: "", transport: "stdio", command: "", args: [], env: {}, url: "", instruction: "" });
+      setCreateForm({ name: "", transport: "stdio", command: "", args: [], env: {}, url: "", instruction: "", emoji: "" });
       await loadMcps();
     } catch (err) {
       console.error(err);
@@ -254,6 +255,7 @@ export default function McpPage() {
       ...prev,
       [m.id]: {
         name: m.name,
+        emoji: m.emoji ?? "",
         command: server.command ?? "",
         args: (server.args ?? []).join("\n"),
         url: server.url ?? "",
@@ -274,6 +276,7 @@ export default function McpPage() {
       const envPayload = Object.keys(form.env).length > 0 ? form.env : undefined;
       await mcpApi.update(id, {
         name: form.name,
+        emoji: form.emoji || undefined,
         ...(transport === "stdio"
           ? { command: form.command, args: form.args.split("\n").filter(Boolean), env: envPayload }
           : { url: form.url }),
@@ -316,6 +319,7 @@ export default function McpPage() {
           <Card key={m.id}>
             <McpHeader>
               <McpName>
+                <span style={{ fontSize: "1.2em" }}>{m.emoji || "🛠️"}</span>
                 {m.name}
                 <Badge variant={m.running ? "success" : "danger"}>
                   {m.running ? "running" : "stopped"}
@@ -368,17 +372,33 @@ export default function McpPage() {
             {/* Edit section */}
             {expandedEdit.has(m.id) && editForms[m.id] && (
               <EditSection>
-                <div>
-                  <label>Name</label>
-                  <Input
-                    value={editForms[m.id].name}
-                    onChange={(e) =>
-                      setEditForms((prev) => ({
-                        ...prev,
-                        [m.id]: { ...prev[m.id], name: e.target.value },
-                      }))
-                    }
-                  />
+                <div style={{ display: "flex", gap: "var(--space-md)" }}>
+                  <div style={{ flex: 1 }}>
+                    <label>Name</label>
+                    <Input
+                      value={editForms[m.id].name}
+                      onChange={(e) =>
+                        setEditForms((prev) => ({
+                          ...prev,
+                          [m.id]: { ...prev[m.id], name: e.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div style={{ width: 60 }}>
+                    <label>Emoji</label>
+                    <Input
+                      value={editForms[m.id].emoji}
+                      onChange={(e) =>
+                        setEditForms((prev) => ({
+                          ...prev,
+                          [m.id]: { ...prev[m.id], emoji: e.target.value },
+                        }))
+                      }
+                      placeholder="🛠️"
+                      style={{ textAlign: "center", fontSize: "1.2em" }}
+                    />
+                  </div>
                 </div>
                 {m.transport === "stdio" ? (
                   <>
@@ -566,15 +586,28 @@ export default function McpPage() {
       {showCreate && (
         <Modal title="MCP Server hinzufügen" onClose={() => setShowCreate(false)}>
           <FormGrid>
-            <div>
-              <label>Name</label>
-              <Input
-                value={createForm.name}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, name: e.target.value }))
-                }
-                placeholder="z.B. Filesystem"
-              />
+            <div style={{ display: "flex", gap: "var(--space-md)" }}>
+              <div style={{ flex: 1 }}>
+                <label>Name</label>
+                <Input
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  placeholder="z.B. Filesystem"
+                />
+              </div>
+              <div style={{ width: 60 }}>
+                <label>Emoji</label>
+                <Input
+                  value={createForm.emoji ?? ""}
+                  onChange={(e) =>
+                    setCreateForm((prev) => ({ ...prev, emoji: e.target.value }))
+                  }
+                  placeholder="🛠️"
+                  style={{ textAlign: "center", fontSize: "1.2em" }}
+                />
+              </div>
             </div>
             <div>
               <label>Transport</label>

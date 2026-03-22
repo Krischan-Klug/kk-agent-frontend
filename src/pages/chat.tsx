@@ -615,10 +615,20 @@ export default function ChatPage() {
     }
   }
 
+  function getToolEmoji(toolName: string): string {
+    for (const m of mcps) {
+      if (m.tools.some((t) => t.name === toolName)) {
+        return m.emoji || "🛠️";
+      }
+    }
+    return "🛠️";
+  }
+
   function renderToolCalls(toolCalls: ActiveToolCall[]) {
     return toolCalls.map((tc) => (
       <ToolCard key={tc.id}>
         <CardSummary>
+          <span style={{ fontSize: "1em" }}>{getToolEmoji(tc.name)}</span>
           <ToolLabel>{tc.name}</ToolLabel>
           {tc.result ? (
             <Badge variant={tc.result.isError ? "danger" : "success"}>
