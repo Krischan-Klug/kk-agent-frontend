@@ -6,6 +6,13 @@ export interface Theme {
   variables: Record<string, string>;
 }
 
+const THEME_VARIABLE_KEYS = [
+  "--accent",
+  "--accent-hover",
+  "--accent-muted",
+  "--border-focus",
+] as const;
+
 const THEME_STORAGE_KEY = "kk-agent-theme";
 const CUSTOM_THEMES_KEY = "kk-agent-custom-themes";
 
@@ -113,8 +120,11 @@ export function getThemeById(id: string): Theme {
 
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
-  for (const [key, value] of Object.entries(theme.variables)) {
-    root.style.setProperty(key, value);
+  for (const key of THEME_VARIABLE_KEYS) {
+    const value = theme.variables[key];
+    if (value) {
+      root.style.setProperty(key, value);
+    }
   }
 }
 
