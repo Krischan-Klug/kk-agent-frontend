@@ -6,7 +6,7 @@ import { REASONING_LEVELS } from "@/constants/reasoningDefaults";
 import Badge from "@/components/Badge";
 import Button from "@/components/Button";
 import Spinner from "@/components/Spinner";
-import CodeBlock from "@/components/CodeBlock";
+import MarkdownMessage from "@/components/MarkdownMessage";
 import ModelSelect from "@/components/ModelSelect";
 import McpSelect from "@/components/McpSelect";
 import AgentSelect from "@/components/AgentSelect";
@@ -343,38 +343,6 @@ function formatTokens(n: number): string {
 
 /* ── Content Parser ── */
 
-const CODE_FENCE_RE = /```(\w*)\n([\s\S]*?)```/g;
-
-function renderContent(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  CODE_FENCE_RE.lastIndex = 0;
-  while ((match = CODE_FENCE_RE.exec(text)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(
-        <span key={`t${lastIndex}`} style={{ whiteSpace: "pre-wrap" }}>
-          {text.slice(lastIndex, match.index)}
-        </span>,
-      );
-    }
-    parts.push(
-      <CodeBlock key={`c${match.index}`} code={match[2].replace(/\n$/, "")} language={match[1] || undefined} />,
-    );
-    lastIndex = match.index + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    parts.push(
-      <span key={`t${lastIndex}`} style={{ whiteSpace: "pre-wrap" }}>
-        {text.slice(lastIndex)}
-      </span>,
-    );
-  }
-
-  return parts.length > 0 ? parts : text;
-}
 
 /* ── Component ── */
 
@@ -681,7 +649,7 @@ export default function ChatPage() {
           </ReasoningCard>
         )}
 
-        {renderContent(content)}
+        {msg.role === "assistant" ? <MarkdownMessage content={content} /> : content}
 
         {msg.tool_calls && msg.tool_calls.length > 0 &&
           renderToolCalls(
@@ -782,7 +750,7 @@ export default function ChatPage() {
               </ReasoningCard>
             )}
 
-            {renderContent(streamContent)}
+            <MarkdownMessage content={streamContent} />
 
             {streamToolCalls.length > 0 && renderToolCalls(streamToolCalls)}
           </MessageBubble>
