@@ -200,6 +200,10 @@ export interface UpdateAgentBody {
   reasoningEffort?: ReasoningEffort;
 }
 
+export interface SystemVariablesResponse {
+  variables: string[];
+}
+
 /* ── Defaults ── */
 
 export interface AppDefaults {

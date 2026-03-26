@@ -16,6 +16,7 @@ import type {
   ProviderConfig,
   CreateProviderBody,
   UpdateProviderBody,
+  SystemVariablesResponse,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -114,6 +115,8 @@ export const mcp = {
 
 export const agent = {
   list: () => request<AgentDefinition[]>("/agent"),
+
+  systemVariables: () => request<SystemVariablesResponse>("/agent/system-variables"),
 
   create: (body: CreateAgentBody) =>
     request<AgentDefinition>("/agent", {

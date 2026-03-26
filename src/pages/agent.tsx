@@ -144,18 +144,21 @@ const Actions = styled.div`
 export default function AgentPage() {
   const [agents, setAgents] = useState<AgentDefinition[]>([]);
   const [mcps, setMcps] = useState<McpListItem[]>([]);
+  const [systemVariables, setSystemVariables] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editAgent, setEditAgent] = useState<AgentDefinition | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [showSystemVariables, setShowSystemVariables] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    Promise.all([agentApi.list(), mcpApi.list()])
-      .then(([a, m]) => {
+    Promise.all([agentApi.list(), mcpApi.list(), agentApi.systemVariables()])
+      .then(([a, m, sv]) => {
         setAgents(a);
         setMcps(m);
+        setSystemVariables(sv.variables);
         if (a.length > 0) {
           setSelectedId(a[0].id);
           setEditAgent(structuredClone(a[0]));
@@ -419,9 +422,33 @@ export default function AgentPage() {
             {/* 📐 Variablen */}
             <Section>
               <SectionTitle>📐 Variablen</SectionTitle>
-              <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
-                System-Variablen: <code>{"{{CURRENT_DATE}}"}</code>, <code>{"{{CURRENT_TIME}}"}</code>, <code>{"{{iteration}}"}</code>, <code>{"{{maxIterations}}"}</code>
-              </span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-sm)" }}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => setShowSystemVariables((prev) => !prev)}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {showSystemVariables ? "System-Variablen ausblenden" : "System-Variablen anzeigen"}
+                </Button>
+                {showSystemVariables && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "var(--space-xs)",
+                      padding: "var(--space-sm)",
+                      background: "var(--bg-surface)",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  >
+                    {systemVariables.map((variable) => (
+                      <Badge key={variable}>{`{{${variable}}}`}</Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
               {Object.entries(editAgent.variables).map(([key, value]) => (
                 <Row key={key} style={{ alignItems: "center" }}>
                   <Input
