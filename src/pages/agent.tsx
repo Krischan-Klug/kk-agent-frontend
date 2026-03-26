@@ -203,8 +203,6 @@ export default function AgentPage() {
         variables: editAgent.variables,
         defaultModel: editAgent.defaultModel,
         reasoningEffort: editAgent.reasoningEffort,
-        compactionPrompt: editAgent.compactionPrompt,
-        compactionThreshold: editAgent.compactionThreshold,
       });
       setAgents((prev) => prev.map((a) => (a.id === selectedId ? updated : a)));
       setEditAgent(structuredClone(updated));
@@ -317,9 +315,9 @@ export default function AgentPage() {
               />
             </Section>
 
-            {/* 🔄 Iteration & Compaction */}
+            {/* 🔄 Iteration */}
             <Section>
-              <SectionTitle>🔄 Iteration & Compaction</SectionTitle>
+              <SectionTitle>🔄 Iteration</SectionTitle>
               <Row>
                 <div>
                   <FieldLabel>Max Iterationen</FieldLabel>
@@ -335,56 +333,12 @@ export default function AgentPage() {
                     style={{ width: 80 }}
                   />
                 </div>
-                <div>
-                  <FieldLabel>Compaction Threshold</FieldLabel>
-                  <div style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)" }}>
-                    <input
-                      type="range"
-                      min={50}
-                      max={95}
-                      step={5}
-                      value={Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}
-                      onChange={(e) =>
-                        setEditAgent({
-                          ...editAgent,
-                          compactionThreshold: parseInt(e.target.value) / 100,
-                        })
-                      }
-                      style={{ width: 120, accentColor: "var(--accent)" }}
-                    />
-                    <span style={{ fontSize: "var(--font-size-sm)", fontFamily: "var(--font-mono)", minWidth: 36 }}>
-                      {Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}%
-                    </span>
-                  </div>
-                </div>
                 <div style={{ flex: 1, paddingTop: 18 }}>
                   <span style={{ fontSize: "var(--font-size-sm)", color: "var(--text-muted)" }}>
-                    Der Agent iteriert (LLM → Tools → repeat) bis keine Tool-Calls mehr kommen oder das Limit erreicht ist. Bei {Math.round((editAgent.compactionThreshold ?? 0.8) * 100)}% Context-Auslastung wird der bisherige Verlauf komprimiert.
+                    Der Agent iteriert (LLM → Tools → repeat) bis keine Tool-Calls mehr kommen oder das Limit erreicht ist.
                   </span>
                 </div>
               </Row>
-              <label style={{ display: "flex", alignItems: "center", gap: "var(--space-sm)", cursor: "pointer", fontSize: "var(--font-size-sm)", color: "var(--text-secondary)", marginTop: "var(--space-sm)" }}>
-                <input
-                  type="checkbox"
-                  checked={editAgent.compactionPrompt != null}
-                  onChange={(e) =>
-                    setEditAgent({
-                      ...editAgent,
-                      compactionPrompt: e.target.checked ? "" : undefined,
-                    })
-                  }
-                  style={{ accentColor: "var(--accent)" }}
-                />
-                Custom Compaction Prompt
-              </label>
-              {editAgent.compactionPrompt != null && (
-                <TextArea
-                  value={editAgent.compactionPrompt}
-                  onChange={(e) => setEditAgent({ ...editAgent, compactionPrompt: e.target.value })}
-                  rows={8}
-                  placeholder="Überschreibt den Default-Compaction-Prompt für diesen Agent..."
-                />
-              )}
             </Section>
 
             {/* 🔧 MCP-Tools */}

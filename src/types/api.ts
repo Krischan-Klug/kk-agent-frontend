@@ -17,7 +17,6 @@ export interface SessionState {
 export interface SessionMessage {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
-  kind?: "compaction";
   reasoning?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
@@ -86,7 +85,44 @@ export interface ModelSettings {
   reasoningEffort?: ReasoningEffort;
   reasoningOnOff?: boolean;
   levels?: Record<string, ReasoningLevelConfig>;
-  compactionPrompt?: string;
+}
+
+/* ── Provider ── */
+
+export type ProviderType = "lmstudio" | "openai" | "anthropic";
+export type EndpointType = "chat-completions" | "responses" | "completions" | "embeddings";
+export type AuthMethod = "none" | "api-key" | "session-token";
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  type: ProviderType;
+  baseUrl: string;
+  authMethod: AuthMethod;
+  apiKey?: string;
+  sessionToken?: string;
+  endpoint: EndpointType;
+  isDefault?: boolean;
+}
+
+export interface CreateProviderBody {
+  name: string;
+  type: ProviderType;
+  baseUrl: string;
+  authMethod: AuthMethod;
+  apiKey?: string;
+  sessionToken?: string;
+  endpoint: EndpointType;
+}
+
+export interface UpdateProviderBody {
+  name?: string;
+  type?: ProviderType;
+  baseUrl?: string;
+  authMethod?: AuthMethod;
+  apiKey?: string;
+  sessionToken?: string;
+  endpoint?: EndpointType;
 }
 
 export interface CreateMcpBody {
@@ -126,8 +162,6 @@ export interface AgentDefinition {
   variables: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
-  compactionPrompt?: string;
-  compactionThreshold?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -152,8 +186,6 @@ export interface CreateAgentBody {
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
-  compactionPrompt?: string;
-  compactionThreshold?: number;
 }
 
 export interface UpdateAgentBody {
@@ -166,8 +198,6 @@ export interface UpdateAgentBody {
   variables?: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: ReasoningEffort;
-  compactionPrompt?: string;
-  compactionThreshold?: number;
 }
 
 /* ── Defaults ── */
@@ -176,11 +206,6 @@ export interface AppDefaults {
   agent: {
     systemPrompt: string;
     maxIterations: number;
-    compactionThreshold: number;
-  };
-  compaction: {
-    prompt: string;
-    postInstruction: string;
   };
   retry: {
     emptyResponseInstruction: string;
@@ -198,10 +223,9 @@ export type StreamEvent =
   | { type: "content"; content: string }
   | { type: "reasoning"; content: string }
   | { type: "retry_notice"; message: string }
-  | { type: "compaction"; message: SessionMessage }
   | { type: "tool_call"; toolCall: { id: string; name: string; arguments: Record<string, unknown> } }
   | { type: "tool_result"; toolCallId: string; content: string; isError: boolean }
   | { type: "loop_state"; state: AgentLoopState }
-  | { type: "stats"; inputTokens: number; outputTokens: number; reasoningTokens: number }
+  | { type: "stats"; inputTokens: number; outputTokens: number; reasoningTokens: number; source: "provider" | "estimated" | "unknown" }
   | { type: "done"; session: SessionState }
   | { type: "error"; message: string };

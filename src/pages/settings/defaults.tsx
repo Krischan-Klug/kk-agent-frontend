@@ -158,45 +158,7 @@ export default function DefaultsPage() {
                 style={{ width: 100 }}
               />
             </div>
-            <div>
-              <FieldLabel>Compaction Threshold</FieldLabel>
-              <Input
-                type="number"
-                min={0.1}
-                max={1}
-                step={0.05}
-                value={draft.agent.compactionThreshold}
-                onChange={(e) =>
-                  update("agent", "compactionThreshold", Number(e.target.value))
-                }
-                style={{ width: 100 }}
-              />
-              <Hint>0.0 – 1.0 (Anteil des Context-Fensters)</Hint>
-            </div>
           </Row>
-        </Section>
-
-        {/* ── Compaction ── */}
-        <Section>
-          <SectionTitle>📦 Compaction</SectionTitle>
-          <Hint>System-Prompt und Nachricht für die Kontext-Komprimierung.</Hint>
-
-          <FieldLabel>Compaction Prompt</FieldLabel>
-          <TextArea
-            rows={8}
-            value={draft.compaction.prompt}
-            onChange={(e) => update("compaction", "prompt", e.target.value)}
-          />
-
-          <FieldLabel>Post-Compaction Instruction</FieldLabel>
-          <TextArea
-            rows={3}
-            value={draft.compaction.postInstruction}
-            onChange={(e) =>
-              update("compaction", "postInstruction", e.target.value)
-            }
-          />
-          <Hint>Wird nach einer Komprimierung als System-Nachricht eingefügt.</Hint>
         </Section>
 
         {/* ── Retry Instructions ── */}

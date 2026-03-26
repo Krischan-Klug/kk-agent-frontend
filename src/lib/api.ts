@@ -13,6 +13,9 @@ import type {
   UpdateAgentBody,
   ModelSettings,
   AppDefaults,
+  ProviderConfig,
+  CreateProviderBody,
+  UpdateProviderBody,
 } from "@/types/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001";
@@ -30,8 +33,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const provider = {
+  /* Model endpoints */
   getModels: () =>
-    request<{ models: ModelInfo[]; activeModel: string; modelSettings: Record<string, ModelSettings> }>("/provider/models"),
+    request<{ models: ModelInfo[]; activeModel: string; activeProviderId: string; modelSettings: Record<string, ModelSettings> }>("/provider/models"),
 
   switchModel: (model: string) =>
     request<{ activeModel: string }>("/provider/switch", {
@@ -44,6 +48,31 @@ export const provider = {
       `/provider/models/${encodeURIComponent(modelId)}/settings`,
       { method: "PUT", body: JSON.stringify(settings) },
     ),
+
+  /* Provider CRUD */
+  listProviders: () =>
+    request<ProviderConfig[]>("/provider/providers"),
+
+  addProvider: (body: CreateProviderBody) =>
+    request<ProviderConfig>("/provider/providers", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  updateProvider: (id: string, body: UpdateProviderBody) =>
+    request<ProviderConfig>(`/provider/providers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  removeProvider: (id: string) =>
+    request<{ deleted: boolean }>(`/provider/providers/${id}`, { method: "DELETE" }),
+
+  activateProvider: (id: string) =>
+    request<{ activeProviderId: string }>(`/provider/providers/${id}/activate`, { method: "POST" }),
+
+  testProvider: (id: string) =>
+    request<{ ok: boolean; error?: string }>(`/provider/providers/${id}/test`, { method: "POST" }),
 };
 
 export const mcp = {

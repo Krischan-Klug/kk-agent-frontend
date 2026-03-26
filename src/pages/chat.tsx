@@ -310,6 +310,12 @@ interface ActiveToolCall {
   result?: { content: string; isError: boolean };
 }
 
+interface TokenDisplayStats {
+  input: number;
+  output: number;
+  reasoning: number;
+}
+
 /* ── Context Ring ── */
 
 function ContextRing({ used, max }: { used: number; max: number }) {
@@ -389,10 +395,9 @@ export default function ChatPage() {
   const [streamContent, setStreamContent] = useState("");
   const [streamReasoning, setStreamReasoning] = useState("");
   const [streamToolCalls, setStreamToolCalls] = useState<ActiveToolCall[]>([]);
-  const [streamCompactions, setStreamCompactions] = useState<SessionMessage[]>([]);
   const [streamRetryNotices, setStreamRetryNotices] = useState<string[]>([]);
   const [loopState, setLoopState] = useState<AgentLoopState | null>(null);
-  const [tokenStats, setTokenStats] = useState<{ input: number; output: number; reasoning: number } | null>(null);
+  const [tokenStats, setTokenStats] = useState<TokenDisplayStats | null>(null);
 
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -445,9 +450,12 @@ export default function ChatPage() {
   // Resolve effective temperature: session override > level config > default (1.0)
   const resolvedTemp: number = session?.temperature ?? 1.0;
 
-  // Context info
+  // Context info: prefer actual loaded context length, fall back to model maximum
   const modelInfo = session ? modelInfoMap.get(session.model) : undefined;
   const maxCtx = modelInfo?.contextLength ?? modelInfo?.maxContextLength ?? 0;
+  const currentAgentName = session
+    ? (agents.find((agent) => agent.id === session.agentId)?.name ?? session.agentId)
+    : "assistant";
 
   async function handleSend() {
     if (!input.trim() || !session || sending) return;
@@ -458,8 +466,8 @@ export default function ChatPage() {
     setStreamContent("");
     setStreamReasoning("");
     setStreamToolCalls([]);
-    setStreamCompactions([]);
     setLoopState(null);
+    setTokenStats(null);
 
     // Optimistic: add user message
     setSession((prev) =>
@@ -495,14 +503,17 @@ export default function ChatPage() {
               ),
             );
             break;
-          case "compaction":
-            setStreamCompactions((prev) => [...prev, event.message]);
-            break;
           case "loop_state":
             setLoopState(event.state);
             break;
           case "stats":
-            setTokenStats({ input: event.inputTokens, output: event.outputTokens, reasoning: event.reasoningTokens });
+            if (event.source === "provider") {
+              setTokenStats({
+                input: event.inputTokens,
+                output: event.outputTokens,
+                reasoning: event.reasoningTokens,
+              });
+            }
             break;
           case "done":
             setSession(event.session);
@@ -510,7 +521,6 @@ export default function ChatPage() {
             setStreamContent("");
             setStreamReasoning("");
             setStreamToolCalls([]);
-            setStreamCompactions([]);
             setStreamRetryNotices([]);
             setLoopState(null);
             window.dispatchEvent(new Event("session-changed"));
@@ -518,7 +528,6 @@ export default function ChatPage() {
           case "error":
             console.error("Stream error:", event.message);
             setStreaming(false);
-            setStreamCompactions([]);
             setStreamRetryNotices([]);
             setLoopState(null);
             break;
@@ -527,7 +536,6 @@ export default function ChatPage() {
     } catch (err) {
       console.error(err);
       setStreaming(false);
-      setStreamCompactions([]);
       setLoopState(null);
     } finally {
       setSending(false);
@@ -657,15 +665,12 @@ export default function ChatPage() {
     const content = msg.content;
 
     if (msg.role === "tool") return null;
-    if (msg.role === "system" && msg.kind === "compaction") {
-      return <SystemNotice key={idx}>{content}</SystemNotice>;
-    }
 
     return (
       <MessageBubble key={idx} $role={msg.role}>
         {msg.role !== "user" && (
           <RoleLabel>
-            <Badge variant="info">assistant</Badge>
+            <Badge variant="info">{currentAgentName}</Badge>
           </RoleLabel>
         )}
 
@@ -753,10 +758,6 @@ export default function ChatPage() {
 
         {session.messages.map(renderMessage)}
 
-        {streamCompactions.map((msg, idx) => (
-          <SystemNotice key={`stream-compaction-${idx}`}>{msg.content}</SystemNotice>
-        ))}
-
         {streamRetryNotices.map((msg, idx) => (
           <SystemNotice key={`stream-retry-${idx}`}>{msg}</SystemNotice>
         ))}
@@ -765,7 +766,7 @@ export default function ChatPage() {
         {streaming && (streamContent || streamReasoning || streamToolCalls.length > 0) && (
           <MessageBubble $role="assistant">
             <RoleLabel>
-              <Badge variant="info">assistant</Badge>
+              <Badge variant="info">{currentAgentName}</Badge>
               <StreamingDot />
               {loopState && (
                 <IterationPill>
@@ -827,12 +828,12 @@ export default function ChatPage() {
         <Button onClick={handleSend} disabled={sending || !input.trim()}>
           Senden
         </Button>
-        {tokenStats && maxCtx > 0 && (
+        {maxCtx > 0 && tokenStats && (
           <ContextIndicator
             title={`Input: ${tokenStats.input.toLocaleString()} | Output: ${tokenStats.output.toLocaleString()} | Reasoning: ${tokenStats.reasoning.toLocaleString()}`}
           >
             <ContextRing used={tokenStats.input} max={maxCtx} />
-            <span>{formatTokens(tokenStats.input)}/{formatTokens(maxCtx)}</span>
+            <span>{formatTokens(tokenStats.input)} / {formatTokens(maxCtx)}</span>
           </ContextIndicator>
         )}
       </InputArea>
