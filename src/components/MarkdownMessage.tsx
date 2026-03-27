@@ -101,6 +101,18 @@ const Wrapper = styled.div`
   }
 `;
 
+const SimpleBlock = styled.pre`
+  margin: var(--space-xs) 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  white-space: pre-wrap;
+  word-break: break-word;
+`;
+
 const InlineCode = styled.code`
   display: inline-block;
   padding: 1px 6px;
@@ -127,23 +139,29 @@ export default function MarkdownMessage({ content }: MarkdownMessageProps) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code(props: CodeProps) {
-            const { inline, className, children, ...rest } = props;
-            const match = /language-([\w-]+)/.exec(className ?? "");
-            const code = String(children ?? "").replace(/\n$/, "");
-
-            if (inline) {
-              return (
-                <InlineCode {...rest}>
-                  {children}
-                </InlineCode>
-              );
-            }
-
-            return <CodeBlock code={code} language={match?.[1]} />;
-          },
           pre({ children }) {
-            return <>{children}</>;
+            const codeEl = Array.isArray(children) ? children[0] : children;
+            if (
+              !codeEl ||
+              typeof codeEl !== "object" ||
+              !("props" in codeEl)
+            ) {
+              return <pre>{children}</pre>;
+            }
+            const className =
+              (codeEl as React.ReactElement<CodeProps>).props?.className ?? "";
+            const rawChildren =
+              (codeEl as React.ReactElement<CodeProps>).props?.children;
+            const code = String(rawChildren ?? "").replace(/\n$/, "");
+            const match = /language-([\w-]+)/.exec(className);
+
+            if (match || code.includes("\n")) {
+              return <CodeBlock code={code} language={match?.[1]} />;
+            }
+            return <SimpleBlock>{code}</SimpleBlock>;
+          },
+          code({ children, ...rest }: CodeProps) {
+            return <InlineCode {...rest}>{children}</InlineCode>;
           },
         }}
       >
