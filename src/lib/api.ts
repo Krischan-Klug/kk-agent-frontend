@@ -223,6 +223,12 @@ export const session = {
   getPrompt: (id: string) =>
     request<{ systemPrompt: string }>(`/session/${id}/prompt`),
 
+  respondToPrompt: (sessionId: string, promptId: string, selectedKey: string) =>
+    request<{ ok: boolean }>(`/session/${sessionId}/prompt/respond`, {
+      method: "POST",
+      body: JSON.stringify({ promptId, selectedKey }),
+    }),
+
   chatStream: async (
     id: string,
     message: string,

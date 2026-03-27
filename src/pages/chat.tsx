@@ -301,6 +301,46 @@ const StreamingDot = styled.span`
   }
 `;
 
+const PromptCard = styled.div`
+  align-self: center;
+  max-width: 720px;
+  width: 100%;
+  padding: var(--space-md);
+  border: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+`;
+
+const PromptQuestion = styled.div`
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  margin-bottom: var(--space-md);
+  color: var(--text-primary);
+`;
+
+const ChoiceButton = styled.button`
+  display: block;
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  text-align: left;
+
+  &:hover {
+    border-color: var(--accent);
+    background: var(--accent-muted);
+  }
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
 /* ── Types for streaming state ── */
 
 interface ActiveToolCall {
@@ -314,6 +354,12 @@ interface TokenDisplayStats {
   input: number;
   output: number;
   reasoning: number;
+}
+
+interface PendingPrompt {
+  promptId: string;
+  question: string;
+  choices: { key: string; label: string }[];
 }
 
 /* ── Context Ring ── */
@@ -366,6 +412,7 @@ export default function ChatPage() {
   const [streamRetryNotices, setStreamRetryNotices] = useState<string[]>([]);
   const [loopState, setLoopState] = useState<AgentLoopState | null>(null);
   const [tokenStats, setTokenStats] = useState<TokenDisplayStats | null>(null);
+  const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null);
 
   const messagesRef = useRef<HTMLDivElement>(null);
 
@@ -483,6 +530,13 @@ export default function ChatPage() {
               });
             }
             break;
+          case "user_prompt":
+            setPendingPrompt({
+              promptId: event.promptId,
+              question: event.question,
+              choices: event.choices,
+            });
+            break;
           case "done":
             setSession(event.session);
             setStreaming(false);
@@ -491,6 +545,7 @@ export default function ChatPage() {
             setStreamToolCalls([]);
             setStreamRetryNotices([]);
             setLoopState(null);
+            setPendingPrompt(null);
             window.dispatchEvent(new Event("session-changed"));
             break;
           case "error":
@@ -498,6 +553,7 @@ export default function ChatPage() {
             setStreaming(false);
             setStreamRetryNotices([]);
             setLoopState(null);
+            setPendingPrompt(null);
             break;
         }
       });
@@ -588,6 +644,16 @@ export default function ChatPage() {
       window.dispatchEvent(new Event("session-changed"));
     } catch (err) {
       console.error(err);
+    }
+  }
+
+  async function handlePromptResponse(selectedKey: string) {
+    if (!session || !pendingPrompt) return;
+    try {
+      await sessionApi.respondToPrompt(session.id, pendingPrompt.promptId, selectedKey);
+      setPendingPrompt(null);
+    } catch (err) {
+      console.error("Failed to respond to prompt:", err);
     }
   }
 
@@ -756,10 +822,21 @@ export default function ChatPage() {
           </MessageBubble>
         )}
 
-        {streaming && !streamContent && !streamReasoning && streamToolCalls.length === 0 && (
+        {streaming && !streamContent && !streamReasoning && streamToolCalls.length === 0 && !pendingPrompt && (
           <div style={{ alignSelf: "flex-start" }}>
             <Spinner />
           </div>
+        )}
+
+        {pendingPrompt && (
+          <PromptCard>
+            <PromptQuestion>{pendingPrompt.question}</PromptQuestion>
+            {pendingPrompt.choices.map((choice) => (
+              <ChoiceButton key={choice.key} onClick={() => handlePromptResponse(choice.key)}>
+                {choice.label}
+              </ChoiceButton>
+            ))}
+          </PromptCard>
         )}
       </Messages>
 
