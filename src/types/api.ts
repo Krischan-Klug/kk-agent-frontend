@@ -43,6 +43,12 @@ export interface McpServerConfig {
   active: boolean;
   instruction: string;
   emoji?: string;
+  source?: "system" | "custom";
+  systemKey?: "filesystem" | "web-search" | "terminal";
+  systemConfig?: {
+    rootPath?: string;
+    workingDirectory?: string;
+  };
   transport: "stdio" | "sse";
   server: McpStdioConfig | McpSseConfig;
 }
@@ -82,6 +88,7 @@ export interface ReasoningLevelConfig {
 }
 
 export interface ModelSettings {
+  endpoint?: EndpointType;
   reasoningEffort?: ReasoningEffort;
   reasoningOnOff?: boolean;
   levels?: Record<string, ReasoningLevelConfig>;
@@ -90,8 +97,8 @@ export interface ModelSettings {
 /* ── Provider ── */
 
 export type ProviderType = "lmstudio" | "openai" | "anthropic";
-export type EndpointType = "chat-completions" | "responses" | "completions" | "embeddings";
-export type AuthMethod = "none" | "api-key" | "session-token";
+export type EndpointType = "chat-completions" | "responses";
+export type AuthMethod = "none" | "api-key";
 
 export interface ProviderConfig {
   id: string;
@@ -100,8 +107,6 @@ export interface ProviderConfig {
   baseUrl: string;
   authMethod: AuthMethod;
   apiKey?: string;
-  sessionToken?: string;
-  endpoint: EndpointType;
   isDefault?: boolean;
 }
 
@@ -111,8 +116,6 @@ export interface CreateProviderBody {
   baseUrl: string;
   authMethod: AuthMethod;
   apiKey?: string;
-  sessionToken?: string;
-  endpoint: EndpointType;
 }
 
 export interface UpdateProviderBody {
@@ -121,8 +124,6 @@ export interface UpdateProviderBody {
   baseUrl?: string;
   authMethod?: AuthMethod;
   apiKey?: string;
-  sessionToken?: string;
-  endpoint?: EndpointType;
 }
 
 export interface CreateMcpBody {
@@ -138,6 +139,7 @@ export interface CreateMcpBody {
 
 export interface UpdateMcpBody {
   name?: string;
+  active?: boolean;
   transport?: "stdio" | "sse";
   command?: string;
   args?: string[];
@@ -145,6 +147,10 @@ export interface UpdateMcpBody {
   url?: string;
   instruction?: string;
   emoji?: string;
+  systemConfig?: {
+    rootPath?: string;
+    workingDirectory?: string;
+  };
 }
 
 /* ── Agent ── */
@@ -214,7 +220,6 @@ export interface AppDefaults {
   retry: {
     emptyResponseInstruction: string;
     invalidToolInstruction: string;
-    lengthInstruction: string;
   };
   reasoning: {
     defaultEffort: string;

@@ -127,7 +127,10 @@ export default function McpSelect({ mcps, activeMcpIds, onToggle }: McpSelectPro
               <McpRow key={m.id}>
                 <McpLabelGroup>
                   <StatusDot $running={m.running} />
-                  <McpLabel $stopped={!m.running}>{m.name}</McpLabel>
+                  <McpLabel $stopped={!m.running}>
+                    {m.name}
+                    {m.source === "system" ? " (system)" : ""}
+                  </McpLabel>
                 </McpLabelGroup>
                 <Toggle
                   checked={activeMcpIds.includes(m.id)}

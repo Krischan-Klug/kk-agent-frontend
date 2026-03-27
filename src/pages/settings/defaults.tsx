@@ -184,12 +184,6 @@ export default function DefaultsPage() {
             }
           />
 
-          <FieldLabel>Token-Limit erreicht</FieldLabel>
-          <TextArea
-            rows={3}
-            value={draft.retry.lengthInstruction}
-            onChange={(e) => update("retry", "lengthInstruction", e.target.value)}
-          />
         </Section>
 
         {/* ── Reasoning ── */}

@@ -1,23 +1,24 @@
 # kk-agent-frontend
 
-Frontend fuer `kk-agent-backend`. Chat, Agent-Editor, MCP-Verwaltung und Provider-Settings.
+Frontend fuer `kk-agent-backend`.
 
 ## Seiten
 
-- `/chat` — Streaming-Chat mit Iterations-Anzeige, Tool-Cards, Thinking-Ansicht und Session-Controls
-- `/agent` — Agent-Editor: System-Prompt, Iteration (maxIterations + compactionThreshold), MCP-Zuordnung, Variablen, Compaction-Prompt
-- `/session` — Sessions erstellen, loeschen und verwalten
-- `/mcp` — MCP-Server anlegen, starten, stoppen und konfigurieren
-- `/provider` — Modellwahl und Model-Settings
+- `/chat` -> Streaming-Chat mit Markdown-Rendering, Tool-Cards und Loop-State
+- `/agent` -> Agent-Editor fuer Prompt, `maxIterations`, MCP-Zuordnung, Variablen und Reasoning-Effort
+- `/session` -> Sessions erstellen und verwalten
+- `/mcp` -> System- und Custom-MCPs anzeigen und konfigurieren
+- `/provider` -> Modelle und Provider-Settings
+- `/settings/defaults` -> App-Defaults
 
-## API-Vertrag
+## Aktueller API-Vertrag
 
-Das Frontend folgt der aktuellen Backend-Shape:
+Wichtige Punkte:
 
 - Assistant-Messages trennen `content` und `reasoning`
-- Persistierte Compaction-Hinweise erscheinen als neutrale `system`-Verlaufseintraege
-- Thinking wird aus `message.reasoning` gerendert, nicht aus `<think>`-Parsing
 - Nur strukturierte `tool_calls` sind echte Tool-Aufrufe
+- Das Chatfenster rendert Assistant-Text als Markdown
+- `/mcp` zeigt System- und Custom-MCPs in einer gemeinsamen Liste
 
 ### Relevante Typen
 
@@ -25,7 +26,6 @@ Das Frontend folgt der aktuellen Backend-Shape:
 type SessionMessage = {
   role: "user" | "assistant" | "tool" | "system";
   content: string;
-  kind?: "compaction";
   reasoning?: string;
   tool_call_id?: string;
   tool_calls?: Array<{ id: string; name: string; arguments: Record<string, unknown> }>;
@@ -42,39 +42,31 @@ type AgentDefinition = {
   variables: Record<string, string>;
   defaultModel?: string;
   reasoningEffort?: string;
-  compactionPrompt?: string;
-  compactionThreshold?: number;
   createdAt: string;
   updatedAt: string;
 };
 
-type AgentLoopState = {
-  sessionId: string;
-  agentId: string;
-  status: "idle" | "running" | "completed" | "error";
-  iteration: number;
-  maxIterations: number;
-  startedAt: string;
-  updatedAt: string;
+type McpListItem = {
+  id: string;
+  name: string;
+  active: boolean;
+  running: boolean;
+  source?: "system" | "custom";
+  systemKey?: "filesystem" | "web-search" | "terminal";
 };
 ```
 
-## Chat-Verhalten
+## SSE-Events im Chat
 
-Die Chat-Seite verarbeitet folgende SSE-Events:
-
-- `content` — Gestreamter Antworttext
-- `reasoning` — Gestreamtes Thinking/Reasoning
-- `tool_call` — LLM ruft ein Tool auf
-- `tool_result` — Tool-Ergebnis zurueck
-- `loop_state` — Iterations-Status (iteration/maxIterations, status)
-- `compaction` — Context wurde komprimiert
-- `retry_notice` — Korrekturversuch (leere Antwort, invalider Tool-Call)
-- `stats` — Token-Statistiken (input, output, reasoning)
-- `done` — Finale Session mit allen Messages
-- `error` — Fehlermeldung
-
-Waehrend des Streams zeigt ein `IterationPill` die aktuelle Iteration an (z.B. "Iteration 2/10").
+- `content`
+- `reasoning`
+- `retry_notice`
+- `tool_call`
+- `tool_result`
+- `loop_state`
+- `stats`
+- `done`
+- `error`
 
 ## Quick Start
 
@@ -85,4 +77,5 @@ npm run dev
 
 Standard-Port: `3000`
 
-Per Default wird das Backend unter `http://localhost:3001` erwartet. Ueberschreiben ueber `NEXT_PUBLIC_API_URL`.
+Per Default wird das Backend unter `http://localhost:3001` erwartet.
+Ueberschreiben ueber `NEXT_PUBLIC_API_URL`.

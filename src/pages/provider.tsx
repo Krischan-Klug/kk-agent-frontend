@@ -30,16 +30,11 @@ const PROVIDER_TYPES: { value: ProviderType; label: string }[] = [
 const ENDPOINT_OPTIONS: { value: EndpointType; label: string }[] = [
   { value: "chat-completions", label: "/v1/chat/completions" },
   { value: "responses", label: "/v1/responses" },
-  { value: "completions", label: "/v1/completions" },
-  { value: "embeddings", label: "/v1/embeddings" },
 ];
 
 const AUTH_OPTIONS: Record<ProviderType, { value: AuthMethod; label: string }[]> = {
   lmstudio: [{ value: "none", label: "Keine" }],
-  openai: [
-    { value: "api-key", label: "API Key" },
-    { value: "session-token", label: "Session Token" },
-  ],
+  openai: [{ value: "api-key", label: "API Key" }],
   anthropic: [{ value: "api-key", label: "API Key" }],
 };
 
@@ -296,8 +291,6 @@ export default function ProviderPage() {
   const [newBaseUrl, setNewBaseUrl] = useState(DEFAULT_BASE_URLS.lmstudio);
   const [newAuth, setNewAuth] = useState<AuthMethod>("none");
   const [newApiKey, setNewApiKey] = useState("");
-  const [newSessionToken, setNewSessionToken] = useState("");
-  const [newEndpoint, setNewEndpoint] = useState<EndpointType>("chat-completions");
 
   useEffect(() => {
     loadData();
@@ -337,8 +330,6 @@ export default function ProviderPage() {
         baseUrl: newBaseUrl,
         authMethod: newAuth,
         apiKey: newAuth === "api-key" ? newApiKey : undefined,
-        sessionToken: newAuth === "session-token" ? newSessionToken : undefined,
-        endpoint: newEndpoint,
       });
       setProviders((prev) => [...prev, created]);
       setShowCreate(false);
@@ -354,8 +345,6 @@ export default function ProviderPage() {
     setNewBaseUrl(DEFAULT_BASE_URLS.lmstudio);
     setNewAuth("none");
     setNewApiKey("");
-    setNewSessionToken("");
-    setNewEndpoint("chat-completions");
   }
 
   async function handleActivate(id: string) {
@@ -535,17 +524,6 @@ export default function ProviderPage() {
                           onChange={(e) => handleProviderFieldChange(p.id, "baseUrl", e.target.value)}
                         />
                       </FormField>
-                      <FormField>
-                        <Label>Endpoint</Label>
-                        <Select
-                          value={p.endpoint}
-                          onChange={(e) => handleProviderFieldChange(p.id, "endpoint", e.target.value)}
-                        >
-                          {ENDPOINT_OPTIONS.map((ep) => (
-                            <option key={ep.value} value={ep.value}>{ep.label}</option>
-                          ))}
-                        </Select>
-                      </FormField>
                     </FormRow>
 
                     {/* Auth */}
@@ -571,21 +549,6 @@ export default function ProviderPage() {
                               onChange={(e) => handleProviderFieldChange(p.id, "apiKey", e.target.value)}
                               placeholder="sk-..."
                             />
-                          </FormField>
-                        )}
-                        {p.authMethod === "session-token" && (
-                          <FormField $flex={1}>
-                            <Label>Session Token</Label>
-                            <Input
-                              type="password"
-                              value={p.sessionToken ?? ""}
-                              onChange={(e) => handleProviderFieldChange(p.id, "sessionToken", e.target.value)}
-                              placeholder="__Secure-next-auth.session-token Wert"
-                            />
-                            <Hint>
-                              Browser → DevTools → Application → Cookies → chat.openai.com →
-                              __Secure-next-auth.session-token
-                            </Hint>
                           </FormField>
                         )}
                       </FormRow>
@@ -615,6 +578,15 @@ export default function ProviderPage() {
                                     )}
                                   </ModelName>
                                   <SettingsRow>
+                                    <Label>Endpoint:</Label>
+                                    <Select
+                                      value={settings.endpoint ?? "chat-completions"}
+                                      onChange={(e) => handleModelSettingsSave(m.id, { ...settings, endpoint: e.target.value as EndpointType })}
+                                    >
+                                      {ENDPOINT_OPTIONS.map((ep) => (
+                                        <option key={ep.value} value={ep.value}>{ep.label}</option>
+                                      ))}
+                                    </Select>
                                     <label style={{ display: "flex", alignItems: "center", gap: "var(--space-xs)", fontSize: "var(--font-size-sm)", color: "var(--text-muted)", cursor: "pointer" }}>
                                       <input
                                         type="checkbox"
@@ -763,15 +735,6 @@ export default function ProviderPage() {
               />
             </FormField>
 
-            <FormField>
-              <Label>Endpoint</Label>
-              <Select value={newEndpoint} onChange={(e) => setNewEndpoint(e.target.value as EndpointType)}>
-                {ENDPOINT_OPTIONS.map((ep) => (
-                  <option key={ep.value} value={ep.value}>{ep.label}</option>
-                ))}
-              </Select>
-            </FormField>
-
             {newType !== "lmstudio" && (
               <>
                 <FormField>
@@ -795,21 +758,6 @@ export default function ProviderPage() {
                   </FormField>
                 )}
 
-                {newAuth === "session-token" && (
-                  <FormField>
-                    <Label>Session Token</Label>
-                    <Input
-                      type="password"
-                      value={newSessionToken}
-                      onChange={(e) => setNewSessionToken(e.target.value)}
-                      placeholder="Cookie-Wert einfügen"
-                    />
-                    <Hint>
-                      Öffne chat.openai.com → DevTools → Application → Cookies →
-                      kopiere den Wert von __Secure-next-auth.session-token
-                    </Hint>
-                  </FormField>
-                )}
               </>
             )}
 

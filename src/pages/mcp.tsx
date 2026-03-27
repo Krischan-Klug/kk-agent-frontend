@@ -145,6 +145,48 @@ const ConfigDetail = styled.div`
   color: var(--text-secondary);
 `;
 
+type EditForm = {
+  name: string;
+  emoji: string;
+  command: string;
+  args: string;
+  url: string;
+  env: Record<string, string>;
+  rootPath: string;
+  workingDirectory: string;
+};
+
+function buildEditForm(m: McpListItem): EditForm {
+  const server = m.server as McpStdioConfig & { url?: string };
+  return {
+    name: m.name,
+    emoji: m.emoji ?? "",
+    command: server.command ?? "",
+    args: (server.args ?? []).join("\n"),
+    url: server.url ?? "",
+    env: server.env ?? {},
+    rootPath: m.systemConfig?.rootPath ?? "",
+    workingDirectory: m.systemConfig?.workingDirectory ?? "",
+  };
+}
+
+function getStateActionLabel(m: McpListItem): string {
+  if (m.source === "system") return m.active ? "Deaktivieren" : "Aktivieren";
+  return m.running ? "Stop" : "Start";
+}
+
+function getConfigSummary(m: McpListItem): string {
+  if (m.source === "system") {
+    if (m.systemKey === "filesystem") return `rootPath: ${m.systemConfig?.rootPath ?? "-"}`;
+    if (m.systemKey === "terminal") return `workingDirectory: ${m.systemConfig?.workingDirectory ?? "-"}`;
+    return "Interne Web-Suche";
+  }
+
+  return m.transport === "stdio"
+    ? `${(m.server as McpStdioConfig).command} ${((m.server as McpStdioConfig).args ?? []).join(" ")}`
+    : (m.server as { url: string }).url;
+}
+
 export default function McpPage() {
   const [mcps, setMcps] = useState<McpListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -152,11 +194,7 @@ export default function McpPage() {
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set());
   const [expandedInstructions, setExpandedInstructions] = useState<Set<string>>(new Set());
   const [expandedEdit, setExpandedEdit] = useState<Set<string>>(new Set());
-  const [editForms, setEditForms] = useState<
-    Record<string, { name: string; emoji: string; command: string; args: string; url: string; env: Record<string, string> }>
-  >({});
-
-  // Create modal
+  const [editForms, setEditForms] = useState<Record<string, EditForm>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [createForm, setCreateForm] = useState<CreateMcpBody>({
     name: "",
@@ -168,8 +206,6 @@ export default function McpPage() {
     instruction: "",
   });
   const [creating, setCreating] = useState(false);
-
-  // Delete modal
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
@@ -181,7 +217,9 @@ export default function McpPage() {
       const data = await mcpApi.list();
       setMcps(data);
       const instMap: Record<string, string> = {};
-      data.forEach((m) => (instMap[m.id] = m.instruction));
+      data.forEach((m) => {
+        instMap[m.id] = m.instruction;
+      });
       setInstructions(instMap);
     } catch (err) {
       console.error(err);
@@ -192,11 +230,17 @@ export default function McpPage() {
 
   async function handleStartStop(id: string, running: boolean) {
     try {
-      if (running) {
-        await mcpApi.stop(id);
-      } else {
-        await mcpApi.start(id);
-      }
+      if (running) await mcpApi.stop(id);
+      else await mcpApi.start(id);
+      await loadMcps();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleSystemToggle(m: McpListItem) {
+    try {
+      await mcpApi.toggle(m.id, !m.active);
       await loadMcps();
     } catch (err) {
       console.error(err);
@@ -221,10 +265,7 @@ export default function McpPage() {
         transport: createForm.transport,
         emoji: createForm.emoji || undefined,
         command: createForm.transport === "stdio" ? createForm.command : undefined,
-        args:
-          createForm.transport === "stdio" && createForm.args?.length
-            ? createForm.args
-            : undefined,
+        args: createForm.transport === "stdio" && createForm.args?.length ? createForm.args : undefined,
         env: createForm.transport === "stdio" ? envEntries : undefined,
         url: createForm.transport === "sse" ? createForm.url : undefined,
         instruction: createForm.instruction || undefined,
@@ -250,18 +291,7 @@ export default function McpPage() {
   }
 
   function openEdit(m: McpListItem) {
-    const server = m.server as McpStdioConfig & { url?: string };
-    setEditForms((prev) => ({
-      ...prev,
-      [m.id]: {
-        name: m.name,
-        emoji: m.emoji ?? "",
-        command: server.command ?? "",
-        args: (server.args ?? []).join("\n"),
-        url: server.url ?? "",
-        env: server.env ?? {},
-      },
-    }));
+    setEditForms((prev) => ({ ...prev, [m.id]: buildEditForm(m) }));
     setExpandedEdit((prev) => {
       const next = new Set(prev);
       next.add(m.id);
@@ -271,20 +301,35 @@ export default function McpPage() {
 
   async function handleSaveEdit(id: string, transport: string, restart?: boolean) {
     const form = editForms[id];
-    if (!form) return;
+    const mcp = mcps.find((entry) => entry.id === id);
+    if (!form || !mcp) return;
+
     try {
       const envPayload = Object.keys(form.env).length > 0 ? form.env : undefined;
       await mcpApi.update(id, {
         name: form.name,
         emoji: form.emoji || undefined,
-        ...(transport === "stdio"
-          ? { command: form.command, args: form.args.split("\n").filter(Boolean), env: envPayload }
-          : { url: form.url }),
+        ...(mcp.source === "system"
+          ? {
+              systemConfig: {
+                ...(mcp.systemKey === "filesystem" ? { rootPath: form.rootPath } : {}),
+                ...(mcp.systemKey === "terminal" ? { workingDirectory: form.workingDirectory } : {}),
+              },
+            }
+          : transport === "stdio"
+            ? { command: form.command, args: form.args.split("\n").filter(Boolean), env: envPayload }
+            : { url: form.url }),
       });
-      if (restart) {
-        try { await mcpApi.stop(id); } catch { /* not running */ }
+
+      if (restart && mcp.source !== "system") {
+        try {
+          await mcpApi.stop(id);
+        } catch {
+          // not running
+        }
         await mcpApi.start(id);
       }
+
       setExpandedEdit((prev) => {
         const next = new Set(prev);
         next.delete(id);
@@ -311,7 +356,7 @@ export default function McpPage() {
       <PageTitle>MCP Server</PageTitle>
 
       <div style={{ marginBottom: "var(--space-lg)" }}>
-        <Button onClick={() => setShowCreate(true)}>MCP hinzufügen</Button>
+        <Button onClick={() => setShowCreate(true)}>MCP hinzufuegen</Button>
       </div>
 
       <Grid>
@@ -324,52 +369,43 @@ export default function McpPage() {
                 <Badge variant={m.running ? "success" : "danger"}>
                   {m.running ? "running" : "stopped"}
                 </Badge>
+                <Badge>{m.source === "system" ? "system" : "custom"}</Badge>
                 <Badge>{m.transport}</Badge>
               </McpName>
               <Controls>
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => handleStartStop(m.id, m.running)}
+                  onClick={() => (m.source === "system" ? handleSystemToggle(m) : handleStartStop(m.id, m.running))}
                 >
-                  {m.running ? "Stop" : "Start"}
+                  {getStateActionLabel(m)}
                 </Button>
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() =>
-                    expandedEdit.has(m.id)
-                      ? toggleSet(setExpandedEdit, m.id)
-                      : openEdit(m)
-                  }
+                  onClick={() => (expandedEdit.has(m.id) ? toggleSet(setExpandedEdit, m.id) : openEdit(m))}
                 >
-                  {expandedEdit.has(m.id) ? "Schließen" : "Bearbeiten"}
+                  {expandedEdit.has(m.id) ? "Schliessen" : "Bearbeiten"}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => setDeleteTarget(m.id)}
-                >
-                  Löschen
-                </Button>
+                {m.source !== "system" && (
+                  <Button size="sm" variant="danger" onClick={() => setDeleteTarget(m.id)}>
+                    Loeschen
+                  </Button>
+                )}
               </Controls>
             </McpHeader>
 
-            {/* Config display */}
             {!expandedEdit.has(m.id) && (
               <ConfigDetail>
-                {m.transport === "stdio"
-                  ? `${(m.server as McpStdioConfig).command} ${((m.server as McpStdioConfig).args ?? []).join(" ")}`
-                  : (m.server as { url: string }).url}
-                {m.transport === "stdio" && Object.keys((m.server as McpStdioConfig).env ?? {}).length > 0 && (
+                {getConfigSummary(m)}
+                {m.source !== "system" && m.transport === "stdio" && Object.keys((m.server as McpStdioConfig).env ?? {}).length > 0 && (
                   <div style={{ marginTop: "var(--space-xs)", color: "var(--text-muted)", fontSize: "var(--font-size-sm)" }}>
-                    env: {Object.entries((m.server as McpStdioConfig).env!).map(([k, v]) => `${k}=${v}`).join(", ")}
+                    env: {Object.entries((m.server as McpStdioConfig).env ?? {}).map(([k, v]) => `${k}=${v}`).join(", ")}
                   </div>
                 )}
               </ConfigDetail>
             )}
 
-            {/* Edit section */}
             {expandedEdit.has(m.id) && editForms[m.id] && (
               <EditSection>
                 <div style={{ display: "flex", gap: "var(--space-md)" }}>
@@ -400,7 +436,42 @@ export default function McpPage() {
                     />
                   </div>
                 </div>
-                {m.transport === "stdio" ? (
+
+                {m.source === "system" ? (
+                  <>
+                    {m.systemKey === "filesystem" && (
+                      <div>
+                        <label>Root Path</label>
+                        <Input
+                          value={editForms[m.id].rootPath}
+                          onChange={(e) =>
+                            setEditForms((prev) => ({
+                              ...prev,
+                              [m.id]: { ...prev[m.id], rootPath: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
+                    {m.systemKey === "terminal" && (
+                      <div>
+                        <label>Working Directory</label>
+                        <Input
+                          value={editForms[m.id].workingDirectory}
+                          onChange={(e) =>
+                            setEditForms((prev) => ({
+                              ...prev,
+                              [m.id]: { ...prev[m.id], workingDirectory: e.target.value },
+                            }))
+                          }
+                        />
+                      </div>
+                    )}
+                    {m.systemKey === "web-search" && (
+                      <ConfigDetail>Keine weitere System-Konfiguration fuer Web Search in v1.</ConfigDetail>
+                    )}
+                  </>
+                ) : m.transport === "stdio" ? (
                   <>
                     <div>
                       <label>Command</label>
@@ -504,48 +575,30 @@ export default function McpPage() {
                     />
                   </div>
                 )}
+
                 <Actions>
-                  <Button
-                    size="sm"
-                    onClick={() => handleSaveEdit(m.id, m.transport)}
-                  >
+                  <Button size="sm" onClick={() => handleSaveEdit(m.id, m.transport)}>
                     Speichern
                   </Button>
-                  {m.running && (
-                    <Button
-                      size="sm"
-                      onClick={() => handleSaveEdit(m.id, m.transport, true)}
-                    >
+                  {m.source !== "system" && m.running && (
+                    <Button size="sm" onClick={() => handleSaveEdit(m.id, m.transport, true)}>
                       Speichern & Neustarten
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => toggleSet(setExpandedEdit, m.id)}
-                  >
+                  <Button size="sm" variant="secondary" onClick={() => toggleSet(setExpandedEdit, m.id)}>
                     Abbrechen
                   </Button>
                 </Actions>
               </EditSection>
             )}
 
-            {/* Instruction + Tools */}
             <SectionRow>
               <label>Instruction</label>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => toggleSet(setExpandedInstructions, m.id)}
-              >
-                {expandedInstructions.has(m.id) ? "Schließen" : "Bearbeiten"}
+              <Button size="sm" variant="secondary" onClick={() => toggleSet(setExpandedInstructions, m.id)}>
+                {expandedInstructions.has(m.id) ? "Schliessen" : "Bearbeiten"}
               </Button>
               {expandedInstructions.has(m.id) && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleSaveInstruction(m.id)}
-                >
+                <Button size="sm" variant="secondary" onClick={() => handleSaveInstruction(m.id)}>
                   Speichern
                 </Button>
               )}
@@ -556,9 +609,7 @@ export default function McpPage() {
             {expandedInstructions.has(m.id) && (
               <TextArea
                 value={instructions[m.id] ?? ""}
-                onChange={(e) =>
-                  setInstructions((prev) => ({ ...prev, [m.id]: e.target.value }))
-                }
+                onChange={(e) => setInstructions((prev) => ({ ...prev, [m.id]: e.target.value }))}
                 rows={14}
                 style={{ marginTop: "var(--space-sm)" }}
               />
@@ -575,25 +626,18 @@ export default function McpPage() {
             )}
           </Card>
         ))}
-        {mcps.length === 0 && (
-          <p style={{ color: "var(--text-secondary)" }}>
-            Keine MCP Server konfiguriert.
-          </p>
-        )}
+        {mcps.length === 0 && <p style={{ color: "var(--text-secondary)" }}>Keine MCP Server konfiguriert.</p>}
       </Grid>
 
-      {/* Create Modal */}
       {showCreate && (
-        <Modal title="MCP Server hinzufügen" onClose={() => setShowCreate(false)}>
+        <Modal title="MCP Server hinzufuegen" onClose={() => setShowCreate(false)}>
           <FormGrid>
             <div style={{ display: "flex", gap: "var(--space-md)" }}>
               <div style={{ flex: 1 }}>
                 <label>Name</label>
                 <Input
                   value={createForm.name}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, name: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, name: e.target.value }))}
                   placeholder="z.B. Filesystem"
                 />
               </div>
@@ -601,9 +645,7 @@ export default function McpPage() {
                 <label>Emoji</label>
                 <Input
                   value={createForm.emoji ?? ""}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, emoji: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, emoji: e.target.value }))}
                   placeholder="🛠️"
                   style={{ textAlign: "center", fontSize: "1.2em" }}
                 />
@@ -612,20 +654,10 @@ export default function McpPage() {
             <div>
               <label>Transport</label>
               <TransportTabs>
-                <TransportTab
-                  $active={createForm.transport === "stdio"}
-                  onClick={() =>
-                    setCreateForm((prev) => ({ ...prev, transport: "stdio" }))
-                  }
-                >
+                <TransportTab $active={createForm.transport === "stdio"} onClick={() => setCreateForm((prev) => ({ ...prev, transport: "stdio" }))}>
                   stdio
                 </TransportTab>
-                <TransportTab
-                  $active={createForm.transport === "sse"}
-                  onClick={() =>
-                    setCreateForm((prev) => ({ ...prev, transport: "sse" }))
-                  }
-                >
+                <TransportTab $active={createForm.transport === "sse"} onClick={() => setCreateForm((prev) => ({ ...prev, transport: "sse" }))}>
                   sse
                 </TransportTab>
               </TransportTabs>
@@ -636,9 +668,7 @@ export default function McpPage() {
                   <label>Command</label>
                   <Input
                     value={createForm.command ?? ""}
-                    onChange={(e) =>
-                      setCreateForm((prev) => ({ ...prev, command: e.target.value }))
-                    }
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, command: e.target.value }))}
                     placeholder="z.B. npx"
                   />
                 </div>
@@ -715,9 +745,7 @@ export default function McpPage() {
                 <label>URL</label>
                 <Input
                   value={createForm.url ?? ""}
-                  onChange={(e) =>
-                    setCreateForm((prev) => ({ ...prev, url: e.target.value }))
-                  }
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, url: e.target.value }))}
                   placeholder="http://localhost:3002/sse"
                 />
               </div>
@@ -726,11 +754,9 @@ export default function McpPage() {
               <label>Instruction (optional)</label>
               <TextArea
                 value={createForm.instruction ?? ""}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, instruction: e.target.value }))
-                }
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, instruction: e.target.value }))}
                 rows={4}
-                placeholder="System-Instruction für diesen MCP..."
+                placeholder="System-Instruction fuer diesen MCP..."
               />
             </div>
             <Button onClick={handleCreate} disabled={creating || !createForm.name}>
@@ -740,15 +766,14 @@ export default function McpPage() {
         </Modal>
       )}
 
-      {/* Delete Confirmation */}
       {deleteTarget && (
-        <Modal title="MCP löschen?" onClose={() => setDeleteTarget(null)}>
+        <Modal title="MCP loeschen?" onClose={() => setDeleteTarget(null)}>
           <p style={{ color: "var(--text-secondary)", marginBottom: "var(--space-md)" }}>
-            Der MCP Server wird gestoppt und entfernt. Diese Aktion kann nicht rückgängig gemacht werden.
+            Der MCP Server wird gestoppt und entfernt. Diese Aktion kann nicht rueckgaengig gemacht werden.
           </p>
           <Actions>
             <Button variant="danger" onClick={() => handleDelete(deleteTarget)}>
-              Löschen
+              Loeschen
             </Button>
             <Button variant="secondary" onClick={() => setDeleteTarget(null)}>
               Abbrechen
