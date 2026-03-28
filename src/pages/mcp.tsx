@@ -179,7 +179,9 @@ function getConfigSummary(m: McpListItem): string {
   if (m.source === "system") {
     if (m.systemKey === "filesystem") return `rootPath: ${m.systemConfig?.rootPath ?? "-"}`;
     if (m.systemKey === "terminal") return `workingDirectory: ${m.systemConfig?.workingDirectory ?? "-"}`;
-    return "Interne Web-Suche";
+    if (m.systemKey === "web-search") return "Interne Web-Suche";
+    if (m.systemKey === "user-interaction") return "Interne User-Interaktion";
+    return "Internes System-Tool";
   }
 
   return m.transport === "stdio"
@@ -469,6 +471,9 @@ export default function McpPage() {
                     )}
                     {m.systemKey === "web-search" && (
                       <ConfigDetail>Keine weitere System-Konfiguration fuer Web Search in v1.</ConfigDetail>
+                    )}
+                    {m.systemKey === "user-interaction" && (
+                      <ConfigDetail>Keine weitere System-Konfiguration fuer User Interaction in v1.</ConfigDetail>
                     )}
                   </>
                 ) : m.transport === "stdio" ? (
